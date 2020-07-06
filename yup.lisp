@@ -336,6 +336,16 @@ either a path name or are NIL."
 (defclass audio (resource asset) ())
 (defclass video (resource asset) ())
 (defclass txt (asset) ())
+
+(defmethod embedding ((txt txt) &key class id)
+  (let ((contents (split-sequence:split-sequence
+                   #\Newline
+                   (alexandria:read-file-into-string (source-path txt)))))
+    (spinneret:with-html
+      (dolist (content contents)
+        (when (plusp (length content))
+          (:p :class class :id id content))))))
+
 (defclass markdown (asset) ())
 (defclass lass (resource asset) ())
 (defclass parenscript (resource asset) ())

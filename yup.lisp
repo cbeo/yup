@@ -8,13 +8,30 @@
 (defvar *target-root* nil)
 (defvar *assets* nil
   "Maps string keys to ASSET instances")
-(defvar *sources* nil
-  "Maps source paths to instances of SOURCE")
+
+
+(defvar *resources* nil
+  "Maps target paths to instances of RESOURCE")
+
+(defvar *prelude* nil
+  "Path to a lisp file loaded during configuration")
 
 (defgeneric configure (object conf)
   (:documentation "CONF is meant to be a PLIST and OBJECT a class
   instance. The notion is that fields from the CONF are used to configure the OBJECT.")
   (:method (object conf)))
+
+(defgeneric build (res)
+  (:documentation "A function used to transform a resource into its
+  built form. Should actually output the built resource to the build destination."))
+
+(defmacro embed (key &rest args)
+  `(funcall #'embedding (gethash ,key *assets*) ,@args))
+
+(defgeneric embedding (asset &key)
+  (:documentation "A method meant to be called by the BUILD method of
+  template like resources. Ordinarily called from the expanded body of
+  EMBED macro."))
 
 (defclass source ()
   ((source
@@ -44,12 +61,10 @@
     (when (uiop:file-pathname-p dest)
       (setf (target-path ob) dest))))
 
-(defgeneric build (res)
-  (:documentation "A function used to transform a resource into its
-  built form. Should actually output the built resource to the build destination."))
 
 (defmethod build ((res resource))
   (with-slots (source target) res 
+    (ensure-directories-exist target)
     (uiop:copy-file source target)))
 
 (defclass asset (source)
@@ -101,7 +116,7 @@
   (and (pathnamep path)
        (string-equal "yup" (pathname-type path))))
 
-(defun load-prelude (directory)
+(defun load-prelude ()
   (format t "LOAD-PRELUDE not yet implemented"))
 
 (defun read-file (path)
@@ -128,15 +143,14 @@
 (defun standard-asset-file-p (path)
   (member (pathname-type path)
           '("png" "jpg" "jpeg" "mp4" "mpeg" "avi" "ogg"
-            "gif" "ico" "svg" "txt" "md" "org"
-            "parenscript" "lass" "spinneret")
+            "gif" "ico" "svg" "txt" "md" "org" "ps" "parenscript" "lass")
           :test #'equal))
 
 (defun standard-resource-file-p (path)
   (member (pathname-type path)
           '("html" "js" "css" "img" "png" "jpg" "jpeg"
             "bmp" "avi" "ogg" "mp4" "mpeg" "wav"
-            "gif" "ico" "svg" )
+            "gif" "ico" "svg" "parenscript" "lass" "spinneret" "ps")
           :test #'equal))
 
 (defmacro string-case (exp &body body)
@@ -166,6 +180,7 @@
       ("txt" 'txt)                        
       ("md" 'markdown)
       ("lass" 'lass)
+      (("ps" "parenscript") 'parenscript)
       ("spinneret" 'spinneret)
       (t (error "Unsupported source: ~a" (pathname-type path))))))
 
@@ -190,9 +205,6 @@
        :do (setf (getf orig key) val)))
   orig)
 
-(defun register-source (instance)
-  (setf (gethash (source-path instance) *sources*) instance))
-
 (defun read-yupfile (yupfile)
   (list* :path yupfile (read-file yupfile)))
 
@@ -213,11 +225,12 @@ Returns a complete config"
 
         (t (error "Cannot configure null path with null yupfile"))))
 
+;; TODO: try tomake this portable
 (defun actually-hidden-pathname-p (path)
   "Takes a path, any path, and returns T if it is a hidden path on
 UNIXs systems.
 
-Uiop:HIDDEN-PATHNAME-P doesn't return T on hidden directories."
+UIOP:HIDDEN-PATHNAME-P doesn't return T on hidden directories."
   (or (uiop:hidden-pathname-p path)
       (and (uiop:directory-pathname-p path)
            (eql #\.
@@ -257,19 +270,44 @@ either a path name or are NIL."
       (values config
               (nconc mapping (mapcar (lambda (yf) (cons nil yf)) yup-files))))))
 
+(define-condition resource-target-collision-error (error)
+  ((source :initarg :source)
+   (target :initarg :target)))
+
+(defun register-resource (resource)
+  (if  (nth-value 1 (gethash (target-path resource) *resources*))
+       ;; If this exists in the *resources* table, signal an error and
+       ;; handle a couple of restarts
+       (restart-case (error 'resource-target-collision-error
+                            :source (source-path resource)
+                            :target (target-path resource))
+         (use-target (new-target)
+           (setf (target-path resource) new-target)
+           (register-resource resource))
+         (prompt-user ()
+           (format t "The resource target ~a is already used by another resource.~%
+             Enter a new resource path for source file at ~a~%"
+                   (target-path resource)
+                   (source-path resource))
+           (setf (target-path resource) (read-line))
+           (register-resource resource)))
+       ;; otherwise just insert the resource into *resources*
+       (setf (gethash (target-path resource) *resources*) resource)))
 
 
 
 (defun add-source-from-config (config)
   (let ((instance (make-instance (getf config :class))))
     (configure instance config)
-    (register-source instance)
     (when (typep instance 'asset)
-      (register-asset instance))))
+      (register-asset instance))
+    (when (typep instance 'resource)
+      (register-resource instance))))
 
-(defun configure-project (*source-root* *target-root*)
-  (let ((*sources* (make-hash-table :test 'equal))
-        (*assets* (make-hash-table :test 'equal)))
+(defun build-project (*source-root* *target-root*)
+  (load-prelude)
+  (let ((*assets* (make-hash-table :test 'equal))
+        (*resources* (make-hash-table :test 'equal)))
     (labels ((configureator (dir &key parent-overrides)
                (multiple-value-bind (config mapping) (directory-config-scan dir)
                  (let ((overrides (if config
@@ -281,7 +319,7 @@ either a path name or are NIL."
                    (dolist (subdir (uiop:subdirectories dir))
                      (configureator subdir :parent-overrides overrides))))))
       (configureator *source-root*))
-    (list *sources* *assets*)))
+    (loop for resource being the hash-values of *resources* do (build resource))))
 
 (defun md5sum-p (object)
   (typep object '(simple-array (unsigned-byte 8) (16))))
@@ -299,6 +337,61 @@ either a path name or are NIL."
 (defclass video (resource asset) ())
 (defclass txt (asset) ())
 (defclass markdown (asset) ())
-(defclass lass (asset) ())
-(defclass parenscript (asset) ())
-(defclass spinneret (asset) ())
+(defclass lass (resource asset) ())
+(defclass parenscript (resource asset) ())
+
+(defun ensure-path-ext (path ext)
+  (let ((path (namestring path)))
+    (pathname
+     (concatenate 'string
+                  (subseq path 0 (- (length path)
+                                    (length (pathname-type path))))
+                  ext))))
+
+(defmethod build ((script parenscript))
+  (with-slots (source target) script
+    (let ((target (ensure-path-ext target "js")))
+      (ensure-directories-exist target)
+      (alexandria:write-string-into-file
+       (ps:ps-compile-file source)
+       target
+       :if-exists :supersede))))
+
+(defmethod embedding ((script parenscript) &key)
+  (with-slots (target) script
+    (let ((src (ensure-path-ext (strip-path-root target *target-root*) "js")))
+      (spinneret:with-html
+        (:script :src src)))))
+
+(defclass spinneret (resource) ())
+
+(defmethod build ((page spinneret))
+  (with-slots (source target) page
+    (let ((target (ensure-path-ext target "html"))
+          (markup (read-file source)))
+      (ensure-directories-exist target)
+      (with-open-file (spinneret:*html* target :direction :output :if-exists :supersede)
+        (eval `(spinneret:with-html ,markup))))))
+
+(defclass external-project (resource) ()
+  (:documentation "SOURCE represents a directory outside of the scope
+  of the *SOURCE-ROOT* Instances of EXTERNAL-PROJECT are a way to
+  include other document roots into your project. E.g. If you have a
+  static site in another git repo on your machine, you can include an
+  external-project config in your source tree and it will be copied to
+  your build directory."))
+
+(defmethod build ((proj external-project))
+  (with-slots (source target) proj
+    (assert (uiop:directory-pathname-p source))
+    (assert (uiop:directory-pathname-p target))
+    (uiop:collect-sub*directories
+     source
+     (complement #'actually-hidden-pathname-p)
+     (complement #'actually-hidden-pathname-p)
+     (lambda (dir)
+       (dolist (file (uiop:directory-files dir))
+         (unless (actually-hidden-pathname-p file)
+           (let ((file-target (path-append target (strip-path-root file source))))
+             (ensure-directories-exist file-target)
+             (uiop:copy-file file file-target))))))))

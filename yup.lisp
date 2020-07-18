@@ -90,8 +90,9 @@
           (default-asset-key-for (source-path ob)))))
 
 
-(defun default-asset-key-for (path)
-  (concatenate 'string (pathname-name path) "." (pathname-type path)))
+(defun default-asset-key-for (path &optional include-type)
+  (concatenate 'string (pathname-name path)
+               (when include-type (list  "." (pathname-type path)))))
 
 
 (define-condition asset-key-collision-error (error)
@@ -123,7 +124,7 @@
        (string-equal "yup" (pathname-type path))))
 
 (defun load-prelude ()
-  (format t "LOAD-PRELUDE not yet implemented"))
+  (format t "LOAD-PRELUDE not yet implemented~%"))
 
 (defun read-file (path)
   (with-open-file (input path)

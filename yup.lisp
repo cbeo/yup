@@ -359,6 +359,10 @@ either a path name or are NIL."
           (:p :class class :id id content))))))
 
 (defclass markdown (asset) ())
+(defmethod embedding ((md markdown) &key)
+  (cl-markdown:markdown (source-path md)
+                        :stream spinneret::*html*))
+
 (defclass lass (resource asset) ())
 
 (defmethod build ((styles lass))

@@ -125,7 +125,7 @@ to the terminal and the project will not be built.")
     (princ c) (terpri)
     (princ "You must choose a new a new asset key. Before entering the key, however, be sure") (terpri)
     (princ "to update any source files that may embed this asset to reflect the new key.") (terpri)
-    (princ "NEW KEY:") (force-output)
+    (princ "NEW KEY: ") (force-output)
     (invoke-restart restart (read-line))))
 
 (defun log-key-collision (c)
@@ -178,15 +178,15 @@ to the terminal and the project will not be built.")
 
 (defun standard-asset-file-p (path)
   (member (pathname-type path)
-          '("png" "jpg" "jpeg" "mp4" "mpeg" "avi" "ogg"
-            "gif" "ico" "svg" "txt" "md" "org" "ps" "parenscript" "lass")
+          '("png" "jpg" "jpeg" "mp4" "webm" "avi" "ogg" "wav" "mp3"
+            "gif" "ico" "svg" "txt" "md" "parenscript" "lass")
           :test #'equal))
 
 (defun standard-resource-file-p (path)
   (member (pathname-type path)
           '("html" "js" "css" "img" "png" "jpg" "jpeg"
-            "bmp" "avi" "ogg" "mp4" "mpeg" "wav"
-            "gif" "ico" "svg" "parenscript" "lass" "spinneret" "ps")
+            "bmp" "avi" "ogg" "mp4" "mpeg" "wav" "webm" "mp3"
+            "gif" "ico" "svg" "parenscript" "lass" "spinneret")
           :test #'equal))
 
 (defmacro string-case (exp &body body)
@@ -216,7 +216,7 @@ to the terminal and the project will not be built.")
       ("txt" 'txt)                        
       ("md" 'markdown)
       ("lass" 'lass)
-      (("ps" "parenscript") 'parenscript)
+      ("parenscript" 'parenscript)
       ("spinneret" 'spinneret)
       (t (error "Unsupported source: ~a" (pathname-type path))))))
 
@@ -318,7 +318,7 @@ either a path name or are NIL."
     (princ c) (terpri)
     (princ "You should choose a new target path. Before you do, however, ensure") (terpri)
     (princ "that you update your source files to reflect the new target.~%") (terpri)
-    (princ "NEW TARGET:") (force-output)
+    (princ "NEW TARGET: ") (force-output)
     (invoke-restart restart (read-line))))
 
 (defun log-target-collision (c)

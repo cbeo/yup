@@ -81,8 +81,19 @@ to the terminal and the project will not be built.")
       (setf (target-path ob) dest))))
 
 (defmethod build :around ((res resource))
-  (let ((*building-resource* res)) 
-    (call-next-method)))
+  (restart-case 
+      (let ((*building-resource* res)) 
+        (call-next-method))
+    (print-and-retry (e)
+      (format t "While building ~a~%an error was encountered:~%~a~%"
+              (source-path res) e)
+      (if (y-or-n-p "Is the file ready to try rebuilding?")
+          (build res)
+          (format "Skipping ~a~%" (source-path res))))
+    (print-and-skip (e)
+      (format t "While building ~a~%an error was encountered:~%~a~%"
+              (source-path res) e)
+      (format "Skipping ~a~%" (source-path res)))))
 
 (defmethod build ((res resource))
   (with-slots (source target) res 
@@ -224,7 +235,7 @@ to the terminal and the project will not be built.")
       ("lass" 'lass)
       ("parenscript" 'parenscript)
       ("spinneret" 'spinneret)
-      (t (error "Unsupported source: ~a" (pathname-type path))))))
+      (t nil))))
 
 (defun guess-yup-from-path (path)
   (unless (uiop:directory-pathname-p path)
@@ -369,6 +380,16 @@ either a path name or are NIL."
     (:interactive #'prompt-for-target)
     (t #'log-target-collision)))
 
+(defun prompt-and-retry (e)
+  (when-let (restart (find-restart 'print-and-retry))
+    (invoke-restart restart e)))
+
+(defun select-build-error-policy ()
+  (case *configuration-restart-policy*
+    (:interactive #'prompt-and-retry)
+    (t (lambda (e) (when-let (restart (find-restart 'print-and-skip))
+                     (invoke-restart restart e))))))
+
 (defun build-project ()
   "Builds a project. Relies heavily on the values of various special
 variables, which must be set before build-project is run: 
@@ -385,6 +406,7 @@ See docstrings for each for further information.
   (load-prelude)
   (let ((*assets* (make-hash-table :test 'equal))
         (*resources* (make-hash-table :test 'equal)))
+
     (labels ((configureator (dir &key parent-overrides)
                (multiple-value-bind (config mapping) (directory-config-scan dir)
                  (let ((overrides (if config
@@ -398,17 +420,18 @@ See docstrings for each for further information.
 
       (handler-bind ((asset-key-collision-error (select-asset-collision-handler-policy))
                      (resource-target-collision-error (select-resource-collision-handler-policy)))
+        (format t "~%CONFIGURING THE BUILD ...~%~%")
         (configureator *source-root*)))
-    (if (null *config-error-log*)
-        (handler-case 
-            (loop
-               :for resource :being :the :hash-values :of *resources*
-               :do (build resource))
-          (error (c)
-            (princ "Your configuration looks OK but an error was encountered during build.")
-            (terpri) (princ "ERROR: ") (princ c) (terpri)
-            (princ "Are your source files well formed?") (terpri)))
-        (print-config-error-report))))
+
+    (cond ((null *config-error-log*)
+           (format t "~~% ... CONFIGURATION OK!~%~% BUILDING ...~%~%")
+           (handler-bind ((error (select-build-error-policy)))
+             (loop
+                :for resource :being :the :hash-values :of *resources*
+                :do (build resource))))
+          (t 
+           (print-config-error-report)))))
+
 
 (defun print-config-error-report ()
   (format t "~%The project was not built due to the presence of these configuration errors:~%~%")

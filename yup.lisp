@@ -336,13 +336,21 @@ either a path name or are NIL."
                                     (length (pathname-type path))))
                   ext))))
 
+
+(defun url-pathify-target (build-target-path &optional ext)
+  (let ((newpath (cl-fad:merge-pathnames-as-file
+                  "/"
+                  (strip-path-root build-target-path *target-root*))))
+    (if ext (ensure-path-ext newpath ext)
+        newpath)))
+
 ;;; some classes
 
 
 (defclass img (resource asset) ())
 
 (defmethod embedding ((img img) &key class id width height)
-  (let ((target (strip-path-root (target-path img) *target-root*)))
+  (let ((target (url-pathify-target (target-path img))))
     (spinneret:with-html
       (:img :src target :class class :id id :width width :height height))))
 
@@ -374,7 +382,7 @@ either a path name or are NIL."
 
 (defmethod embedding ((styles lass) &key)
   (with-slots (target) styles
-    (let ((href (ensure-path-ext (strip-path-root target *target-root*) "css")))
+    (let ((href (url-pathify-target target "css")))
       (spinneret:with-html
         (:link :rel "stylesheet" :type "text/css" :href href)))))
 
@@ -392,7 +400,7 @@ either a path name or are NIL."
 
 (defmethod embedding ((script parenscript) &key)
   (with-slots (target) script
-    (let ((src (ensure-path-ext (strip-path-root target *target-root*) "js")))
+    (let ((src (url-pathify-target target "js")))
       (spinneret:with-html
         (:script :src src)))))
 

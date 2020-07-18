@@ -6,6 +6,6 @@
   :license  "Specify license here"
   :version "0.0.1"
   :serial t
-  :depends-on (#:spinneret #:lass #:parenscript #:cl-conspack #:uiop #:md5 #:cl-markdown)
+  :depends-on (#:spinneret #:lass #:parenscript #:cl-conspack #:uiop #:md5 #:cl-markdown #:cl-fad)
   :components ((:file "package")
                (:file "yup")))

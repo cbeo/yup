@@ -317,6 +317,8 @@ either a path name or are NIL."
       (configureator *source-root*))
     (loop for resource being the hash-values of *resources* do (build resource))))
 
+;;; some utilities
+
 (defun md5sum-p (object)
   (typep object '(simple-array (unsigned-byte 8) (16))))
 
@@ -326,13 +328,22 @@ either a path name or are NIL."
        (every #'= h1 h2)))
 
 
+(defun ensure-path-ext (path ext)
+  (let ((path (namestring path)))
+    (pathname
+     (concatenate 'string
+                  (subseq path 0 (- (length path)
+                                    (length (pathname-type path))))
+                  ext))))
+
 ;;; some classes
 
 
 (defclass img (resource asset) ())
 
 (defmethod embedding ((img img) &key class id width height)
-  ())
+  (spinneret:with-html
+    (:img :src (target-path img) :class class :id id :width width :height height)))
 
 (defclass audio (resource asset) ())
 (defclass video (resource asset) ())
@@ -349,15 +360,21 @@ either a path name or are NIL."
 
 (defclass markdown (asset) ())
 (defclass lass (resource asset) ())
-(defclass parenscript (resource asset) ())
 
-(defun ensure-path-ext (path ext)
-  (let ((path (namestring path)))
-    (pathname
-     (concatenate 'string
-                  (subseq path 0 (- (length path)
-                                    (length (pathname-type path))))
-                  ext))))
+(defmethod build ((styles lass))
+  (with-slots (source target) styles
+    (let ((target (ensure-path-ext target "css")))
+      (ensure-directories-exist target)
+      (lass:generate source :out target :pretty t))))
+
+(defmethod embedding ((styles lass) &key)
+  (with-slots (target) styles
+    (let ((href (ensure-path-ext (strip-path-root target *target-root*) "css")))
+      (spinneret:with-html
+        (:link :rel "stylesheet" :type "text/css" :href href)))))
+
+
+(defclass parenscript (resource asset) ())
 
 (defmethod build ((script parenscript))
   (with-slots (source target) script

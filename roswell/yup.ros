@@ -60,5 +60,8 @@ exec ros -Q -- $0 "$@"
            cwd
            (ensure-ends-in (gethash "target" options) "/"))))
 
+    (when (gethash "--prelude" options)
+      (load (gethash "--prelude" options)))
+    
     (yup::build-project source target)))
 

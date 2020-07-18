@@ -17,15 +17,14 @@
   prelude , called 'prelude.lisp' will be searched for in
   *SOURCE-ROOT*")
 
-(defvar *asset-key-collision-restart-policy* nil
-  "A condition handler function suitable for use in the binding list
-  of a HANDLER-BIND. Will be used to invoke a restart for
-  'ASSET-KEY-COLLISION-ERROR conditions.")
+(defvar *configuration-restart-policy* nil
+  "Either :INTERACTIVE or NIL.  
 
-(defvar *resource-target-collision-restart-policy* nil
-  "A condition handler function suitable for use in the binding list
-  of a HANDLER-BIND. Will be used to invoke a restart for
-  'RESOURCE-TARGET-COLLISION-ERROR conditions.")
+If :INTERACTIVE, the user will be prompted to resolve configuration
+errors as they come up.
+
+If NIL, if configuration errors are encountered, they will be printed
+to the terminal and the project will not be built.")
 
 (defvar *config-error-log* nil
   "The BUILD-PROJECT will not actually build the project if errors are
@@ -117,7 +116,7 @@
 
 (defmethod print-object ((c asset-key-collision-error) s)
   (with-slots (key source) c
-    (format s "The asset key (~s) for ~a is already in use by another asset.~%"
+    (format s "KEY COLLISION: The asset key ~s is already in use by another asset.~%   Source: ~a~%"
             key source)
     c))
 
@@ -126,7 +125,7 @@
     (princ c) (terpri)
     (princ "You must choose a new a new asset key. Before entering the key, however, be sure") (terpri)
     (princ "to update any source files that may embed this asset to reflect the new key.") (terpri)
-    (princ "NEW KEY:")
+    (princ "NEW KEY:") (force-output)
     (invoke-restart restart (read-line))))
 
 (defun log-key-collision (c)
@@ -138,7 +137,7 @@
   (if  (nth-value 1 (gethash (asset-key asset) *assets*))
        ;; If this exists in the *assets* table, signal an error and
        ;; handle a couple of restarts
-       (restart-case (error 'asset-name-collision-error
+       (restart-case (error 'asset-key-collision-error
                             :key (asset-key asset)
                             :source (source-path asset))
          (use-key (new-key)
@@ -310,8 +309,8 @@ either a path name or are NIL."
 
 (defmethod print-object ((c resource-target-collision-error) s)
   (with-slots (source target) c
-      (format s "TARGET COLLISION:The file ~s~% is being built to ~s~% but so is another resource."
-              source target)
+    (format s "TARGET COLLISION: The build target ~s is used by another resource.~%  Source: ~s~%"
+            target source)
     c))
 
 (defun prompt-for-target (c)
@@ -319,7 +318,7 @@ either a path name or are NIL."
     (princ c) (terpri)
     (princ "You should choose a new target path. Before you do, however, ensure") (terpri)
     (princ "that you update your source files to reflect the new target.~%") (terpri)
-    (princ "NEW TARGET:")
+    (princ "NEW TARGET:") (force-output)
     (invoke-restart restart (read-line))))
 
 (defun log-target-collision (c)
@@ -354,7 +353,29 @@ either a path name or are NIL."
 
 ;;; the main project builder
 
+(defun select-asset-collision-handler-policy ()
+  (case *configuration-restart-policy*
+    (:interactive #'prompt-for-key)
+    (t #'log-key-collision)))
+
+(defun select-resource-collision-handler-policy ()
+  (case *configuration-restart-policy*
+    (:interactive #'prompt-for-target)
+    (t #'log-target-collision)))
+
 (defun build-project ()
+  "Builds a project. Relies heavily on the values of various special
+variables, which must be set before build-project is run: 
+
+- *SOURCE-ROOT* 
+- *TARGET-ROOT* 
+- *PRELUDE* 
+- *CONFIG-ERROR-LOG* 
+- *CONFIGURATION-RESTART-POLICY* 
+
+See docstrings for each for further information.
+"
+
   (load-prelude)
   (let ((*assets* (make-hash-table :test 'equal))
         (*resources* (make-hash-table :test 'equal)))
@@ -369,20 +390,24 @@ either a path name or are NIL."
                    (dolist (subdir (uiop:subdirectories dir))
                      (configureator subdir :parent-overrides overrides))))))
 
-      ;; TODO wrap the follioing in a handler-bind's here for
-      ;; resource-target-collision-error and asset-key-collision-error
-      ;; conditions. The policy should be controlled by a special var
-      (configureator *source-root*))
+      (handler-bind ((asset-key-collision-error (select-asset-collision-handler-policy))
+                     (resource-target-collision-error (select-resource-collision-handler-policy)))
+        (configureator *source-root*)))
     (if (null *config-error-log*)
-        (loop
-           :for resource :being :the :hash-values :of *resources*
-           :do (build resource))
+        (handler-case 
+            (loop
+               :for resource :being :the :hash-values :of *resources*
+               :do (build resource))
+          (error (c)
+            (princ "Your configuration looks OK but an error was encountered during build.")
+            (terpri) (princ "ERROR: ") (princ c) (terpri)
+            (princ "Are your source files well formed?") (terpri)))
         (print-config-error-report))))
 
 (defun print-config-error-report ()
-  (format t "~%The project was not built due to the presence of these configuration errors:~%")
+  (format t "~%The project was not built due to the presence of these configuration errors:~%~%")
   (dolist (e *config-error-log*)
-    (format t "~a~%" e)))
+    (format t "- ~a~%" e)))
 
 ;;; some utilities
 

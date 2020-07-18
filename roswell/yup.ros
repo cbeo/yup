@@ -9,7 +9,7 @@ exec ros -Q -- $0 "$@"
   )
 
 (defpackage :ros.script.yup.3801822927
-  (:use :cl))
+  (:use :cl :yup))
 (in-package :ros.script.yup.3801822927)
 
 
@@ -47,8 +47,12 @@ exec ros -Q -- $0 "$@"
       str
       (concatenate 'string str ending)))
 
+(defun select-restart-policy (options)
+  (cond ((or (gethash "--interactive" options)
+             (gethash "-i" options)) :interactive)
+        (t nil))) ;; written this way in case I add more
+
 (defun main (&rest argv)
-  (declare (ignorable argv))
   (let* ((options (parse-args '("source" "target") argv))
          (cwd (uiop:getcwd))
          (source
@@ -60,8 +64,11 @@ exec ros -Q -- $0 "$@"
            cwd
            (ensure-ends-in (gethash "target" options) "/"))))
 
-    (when (gethash "--prelude" options)
-      (load (gethash "--prelude" options)))
-    
-    (yup::build-project source target)))
+    (let ((yup::*source-root* source)
+          (yup::*target-root* target)
+          (yup::*prelude* (gethash "--prelude" options))
+          (yup::*config-error-log* nil)
+          (yup::*configuration-restart-policy*
+           (select-restart-policy options)))
+      (yup::build-project))))
 

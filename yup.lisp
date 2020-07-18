@@ -351,7 +351,7 @@ either a path name or are NIL."
 
 (defmethod embedding ((img img) &key class id width height)
   (let ((target (url-pathify-target (target-path img))))
-    (spinneret:with-html
+    (with-html
       (:img :src target :class class :id id :width width :height height))))
 
 (defclass audio (resource asset) ())
@@ -361,8 +361,8 @@ either a path name or are NIL."
 (defmethod embedding ((txt txt) &key class id)
   (let ((contents (split-sequence:split-sequence
                    #\Newline
-                   (alexandria:read-file-into-string (source-path txt)))))
-    (spinneret:with-html
+                   (read-file-into-string (source-path txt)))))
+    (with-html
       (dolist (content contents)
         (when (plusp (length content))
           (:p :class class :id id content))))))
@@ -383,7 +383,7 @@ either a path name or are NIL."
 (defmethod embedding ((styles lass) &key)
   (with-slots (target) styles
     (let ((href (url-pathify-target target "css")))
-      (spinneret:with-html
+      (with-html
         (:link :rel "stylesheet" :type "text/css" :href href)))))
 
 
@@ -393,7 +393,7 @@ either a path name or are NIL."
   (with-slots (source target) script
     (let ((target (ensure-path-ext target "js")))
       (ensure-directories-exist target)
-      (alexandria:write-string-into-file
+      (write-string-into-file
        (ps:ps-compile-file source)
        target
        :if-exists :supersede))))
@@ -401,10 +401,17 @@ either a path name or are NIL."
 (defmethod embedding ((script parenscript) &key)
   (with-slots (target) script
     (let ((src (url-pathify-target target "js")))
-      (spinneret:with-html
+      (with-html
         (:script :src src)))))
 
-(defclass spinneret (resource) ())
+(defclass spinneret (resource asset) ())
+
+(defmethod embedding ((page spinneret)
+                      &key (link-text (pathname-name (target-path page))) class id)
+  (with-html
+    (:a :href (url-pathify-target (target-path page) "html")
+        :class class :id id
+        link-text)))
 
 (defmethod build ((page spinneret))
   (with-slots (source target) page

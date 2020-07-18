@@ -24,13 +24,17 @@
   (:documentation "A function used to transform a resource into its
   built form. Should actually output the built resource to the build destination."))
 
-(defmacro embed (key &rest args)
-  `(funcall #'embedding (gethash ,key *assets*) ,@args))
+(defvar *building-resource* nil
+  "Dynamically bound  by BUILD - for use in EMBEDDING implementations.")
 
-(defgeneric embedding (asset &key)
-  (:documentation "A method meant to be called by the BUILD method of
-  template like resources. Ordinarily called from the expanded body of
-  EMBED macro."))
+(defmacro embed (key &rest args)
+  `(funcall #'embedding *building-resource* (gethash ,key *assets*) ,@args))
+
+(defgeneric embedding (resource asset &key)
+  (:documentation "Embeds the ASSET in the RESOURCE.  If evoked from
+  an expansion of the EMBED macro, then resource will be the current
+  value of *BUILDING-RESOURCE*, which will have been bound in the call
+  to BUILD."))
 
 (defclass source ()
   ((source
@@ -60,6 +64,9 @@
     (when (uiop:file-pathname-p dest)
       (setf (target-path ob) dest))))
 
+(defmethod build :around ((res resource))
+  (let ((*building-resource* res)) 
+    (call-next-method)))
 
 (defmethod build ((res resource))
   (with-slots (source target) res 
@@ -346,19 +353,36 @@ either a path name or are NIL."
 
 ;;; some classes
 
+(defclass spinneret (resource asset) ())
+
+(defmethod embedding ((res spinneret) (page spinneret)
+                      &key (link-text (pathname-name (target-path page))) class id)
+  (with-html
+    (:a :href (url-pathify-target (target-path page) "html")
+        :class class :id id
+        link-text)))
+
+(defmethod build ((page spinneret))
+  (with-slots (source target) page
+    (let ((target (ensure-path-ext target "html"))
+          (markup (read-file source)))
+      (ensure-directories-exist target)
+      (with-open-file (spinneret:*html* target :direction :output :if-exists :supersede)
+        (eval `(spinneret:with-html ,markup))))))
 
 (defclass img (resource asset) ())
 
-(defmethod embedding ((img img) &key class id width height)
+(defmethod embedding ((res spinneret) (img img) &key class id width height)
   (let ((target (url-pathify-target (target-path img))))
     (with-html
       (:img :src target :class class :id id :width width :height height))))
 
 (defclass audio (resource asset) ())
 (defclass video (resource asset) ())
+
 (defclass txt (asset) ())
 
-(defmethod embedding ((txt txt) &key class id)
+(defmethod embedding ((res spinneret) (txt txt) &key class id)
   (let ((contents (split-sequence:split-sequence
                    #\Newline
                    (read-file-into-string (source-path txt)))))
@@ -368,7 +392,7 @@ either a path name or are NIL."
           (:p :class class :id id content))))))
 
 (defclass markdown (asset) ())
-(defmethod embedding ((md markdown) &key)
+(defmethod embedding ((res spinneret) (md markdown) &key)
   (cl-markdown:markdown (source-path md)
                         :stream spinneret::*html*))
 
@@ -380,7 +404,7 @@ either a path name or are NIL."
       (ensure-directories-exist target)
       (lass:generate source :out target :pretty t))))
 
-(defmethod embedding ((styles lass) &key)
+(defmethod embedding ((res spinneret) (styles lass) &key)
   (with-slots (target) styles
     (let ((href (url-pathify-target target "css")))
       (with-html
@@ -398,28 +422,12 @@ either a path name or are NIL."
        target
        :if-exists :supersede))))
 
-(defmethod embedding ((script parenscript) &key)
+(defmethod embedding ((res spinneret) (script parenscript) &key)
   (with-slots (target) script
     (let ((src (url-pathify-target target "js")))
       (with-html
         (:script :src src)))))
 
-(defclass spinneret (resource asset) ())
-
-(defmethod embedding ((page spinneret)
-                      &key (link-text (pathname-name (target-path page))) class id)
-  (with-html
-    (:a :href (url-pathify-target (target-path page) "html")
-        :class class :id id
-        link-text)))
-
-(defmethod build ((page spinneret))
-  (with-slots (source target) page
-    (let ((target (ensure-path-ext target "html"))
-          (markup (read-file source)))
-      (ensure-directories-exist target)
-      (with-open-file (spinneret:*html* target :direction :output :if-exists :supersede)
-        (eval `(spinneret:with-html ,markup))))))
 
 (defclass external-project (resource) ()
   (:documentation "SOURCE represents a directory outside of the scope

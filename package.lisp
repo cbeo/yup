@@ -12,6 +12,9 @@
    #:spinneret
    #:with-html
    #:with-html-string)
+  (:import-from
+   #:serapeum
+   #:find-class-safe)
   (:export
    #:embed
    #:configure

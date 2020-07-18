@@ -295,7 +295,7 @@ Returns a list of pairs (PATH . YUPFILE). PATH and YUPFILE are both
 either a path name or are NIL."
   (let* ((files (remove-if #'actually-hidden-pathname-p (uiop:directory-files directory)))
          (yup-files (remove-if-not #'yupfile-p files))
-         (regular-files  (remove-if #'yupfile-p files))
+         (regular-files (remove-if #'yupfile-p files))
          (config)
          (mapping))
 
@@ -358,15 +358,40 @@ either a path name or are NIL."
        ;; otherwise just insert the resource into *resources*
        (setf (gethash (target-path resource) *resources*) resource)))
 
+(define-condition no-such-source-class (error)
+  ((class :initarg :class)
+   (source :initarg :source)))
 
+(defmethod print-object ((c no-such-source-class) s)
+  (with-slots (class source) c
+    (format s "BAD SOURCE CLASS: The configuration for ~s~%is trying to use a class ~s, but no such class is found.~%"
+     source class)))
+
+(defun find-class-from-config (config)
+  (if-let (class (find-class-safe (getf config :class)))
+    class
+    (error 'no-such-source-class
+           :class (getf config :class)
+           :source (getf config :source))))
+
+(defun prompt-for-class (c)
+  (when-let (restart (find-restart 'use-class-named))
+    (princ c) (terpri)
+    (princ "Choose a new class: ")
+    (invoke-restart restart (read))))
 
 (defun add-source-from-config (config)
-  (let ((instance (make-instance (getf config :class))))
-    (configure instance config)
-    (when (typep instance 'asset)
-      (register-asset instance))
-    (when (typep instance 'resource)
-      (register-resource instance))))
+  (restart-case 
+      (let ((instance (make-instance (find-class-from-config config))))
+        (configure instance config)
+        (when (typep instance 'asset)
+          (register-asset instance))
+        (when (typep instance 'resource)
+          (register-resource instance)))
+    (use-class-named (class-name)
+      (setf (getf config :class) class-name)
+      (add-source-from-config config))
+    (skip-config () (return-from add-source-from-config))))
 
 ;;; the main project builder
 
@@ -389,6 +414,14 @@ either a path name or are NIL."
     (:interactive #'prompt-and-retry)
     (t (lambda (e) (when-let (restart (find-restart 'print-and-skip))
                      (invoke-restart restart e))))))
+
+(defun select-no-such-source-class-handler-policy ()
+  (case *configuration-restart-policy*
+    (:interactive #'prompt-for-class)
+    (t (lambda (e) (when-let (restart (find-restart 'skip-config))
+                     (push e *config-error-log*)
+                     (invoke-restart restart))))))
+
 
 (defun build-project ()
   "Builds a project. Relies heavily on the values of various special
@@ -419,7 +452,8 @@ See docstrings for each for further information.
                      (configureator subdir :parent-overrides overrides))))))
 
       (handler-bind ((asset-key-collision-error (select-asset-collision-handler-policy))
-                     (resource-target-collision-error (select-resource-collision-handler-policy)))
+                     (resource-target-collision-error (select-resource-collision-handler-policy))
+                     (no-such-source-class (select-no-such-source-class-handler-policy)))
         (format t "~%CONFIGURING THE BUILD ...~%~%")
         (configureator *source-root*)))
 

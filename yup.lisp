@@ -342,8 +342,9 @@ either a path name or are NIL."
 (defclass img (resource asset) ())
 
 (defmethod embedding ((img img) &key class id width height)
-  (spinneret:with-html
-    (:img :src (target-path img) :class class :id id :width width :height height)))
+  (let ((target (strip-path-root (target-path img) *target-root*)))
+    (spinneret:with-html
+      (:img :src target :class class :id id :width width :height height))))
 
 (defclass audio (resource asset) ())
 (defclass video (resource asset) ())

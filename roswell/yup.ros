@@ -1,0 +1,64 @@
+#!/bin/sh
+#|-*- mode:lisp -*-|#
+#|
+exec ros -Q -- $0 "$@"
+|#
+(progn ;;init forms
+  (ros:ensure-asdf)
+  #+quicklisp(ql:quickload '(yup cl-fad) :silent t)
+  )
+
+(defpackage :ros.script.yup.3801822927
+  (:use :cl))
+(in-package :ros.script.yup.3801822927)
+
+
+(defun flag-p (arg)
+  (or (string= "--" arg :end2 2)
+      (and (= 2 (length arg))
+           (eql #\- (elt arg 0)))))
+
+(defun parse-args (positional argv)
+  (let ((options (make-hash-table :test 'equal)))
+    (dolist (p positional)
+      (setf (gethash p options) (pop argv)))
+    (labels ((rec (args)
+               (cond ((and (car args) (null (cdr args)) (flag-p (car args)))
+                      (setf (gethash (car args) options) t))
+
+                     ((and (car args) (cdr args)
+                           (flag-p (car args))
+                           (not (flag-p (second args))))
+                      (setf (gethash (car args) options) (second args))
+                      (rec (cddr args)))
+
+                     ((and (car args) (cdr args) (flag-p (car args)))
+                      (setf (gethash (car args) options) t)
+                      (rec (cdr args)))
+
+                     ((null args) t)
+
+                     (t (error "bad argument list")))))
+      (rec argv))
+    options))
+
+(defun ensure-ends-in (str ending)
+  (if (string= str ending :start1 (- (length str) (length ending)))
+      str
+      (concatenate 'string str ending)))
+
+(defun main (&rest argv)
+  (declare (ignorable argv))
+  (let* ((options (parse-args '("source" "target") argv))
+         (cwd (uiop:getcwd))
+         (source
+          (cl-fad:merge-pathnames-as-directory
+           cwd
+           (ensure-ends-in (gethash "source" options) "/")))
+         (target
+          (cl-fad:merge-pathnames-as-directory
+           cwd
+           (ensure-ends-in (gethash "target" options) "/"))))
+
+    (yup::build-project source target)))
+

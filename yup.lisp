@@ -9,7 +9,6 @@
 (defvar *assets* nil
   "Maps string keys to ASSET instances")
 
-
 (defvar *resources* nil
   "Maps target paths to instances of RESOURCE")
 
@@ -184,9 +183,6 @@
       ("spinneret" 'spinneret)
       (t (error "Unsupported source: ~a" (pathname-type path))))))
 
-
-
-
 (defun guess-yup-from-path (path)
   (unless (uiop:directory-pathname-p path)
     (append (list :source path :path path) ;; path is "yup config" source is "file source"
@@ -332,7 +328,12 @@ either a path name or are NIL."
 
 ;;; some classes
 
+
 (defclass img (resource asset) ())
+
+(defmethod embedding ((img img) &key class id width height)
+  ())
+
 (defclass audio (resource asset) ())
 (defclass video (resource asset) ())
 (defclass txt (asset) ())

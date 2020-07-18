@@ -152,8 +152,14 @@ to the terminal and the project will not be built.")
   (and (pathnamep path)
        (string-equal "yup" (pathname-type path))))
 
+(defun default-prelude-file ()
+  (or (and *prelude* (pathname *prelude*))
+      (cl-fad:merge-pathnames-as-file (uiop:getcwd) "prelude.lisp")))
+
 (defun load-prelude ()
-  (format t "LOAD-PRELUDE not yet implemented~%"))
+  (let ((prelude-file (default-prelude-file)))
+    (when (uiop:file-exists-p prelude-file)
+      (load prelude-file))))
 
 (defun read-file (path)
   (with-open-file (input path)
@@ -278,7 +284,7 @@ Returns a list of pairs (PATH . YUPFILE). PATH and YUPFILE are both
 either a path name or are NIL."
   (let* ((files (remove-if #'actually-hidden-pathname-p (uiop:directory-files directory)))
          (yup-files (remove-if-not #'yupfile-p files))
-         (regular-files (remove-if #'yupfile-p files))
+         (regular-files  (remove-if #'yupfile-p files))
          (config)
          (mapping))
 

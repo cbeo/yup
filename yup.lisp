@@ -411,15 +411,6 @@ See docstrings for each for further information.
 
 ;;; some utilities
 
-(defun md5sum-p (object)
-  (typep object '(simple-array (unsigned-byte 8) (16))))
-
-(defun md5sum-equal (h1 h2)
-  (assert (and (md5sum-p h1) (md5sum-p h2)))
-  (and (= (length h1) (length h2))
-       (every #'= h1 h2)))
-
-
 (defun ensure-path-ext (path ext)
   (let ((path (namestring path)))
     (pathname

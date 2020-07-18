@@ -13,7 +13,19 @@
   "Maps target paths to instances of RESOURCE")
 
 (defvar *prelude* nil
-  "Path to a lisp file loaded during configuration")
+  "Path to a lisp file loaded during configuration. If NIL a default
+  prelude , called 'prelude.lisp' will be searched for in
+  *SOURCE-ROOT*")
+
+(defvar *asset-key-collision-restart-policy* nil
+  "A condition handler function suitable for use in the binding list
+  of a HANDLER-BIND. Will be used to invoke a restart for
+  'ASSET-KEY-COLLISION-ERROR conditions.")
+
+(defvar *resource-target-collision-restart-policy* nil
+  "A condition handler function suitable for use in the binding list
+  of a HANDLER-BIND. Will be used to invoke a restart for
+  'RESOURCE-TARGET-COLLISION-ERROR conditions.")
 
 (defgeneric configure (object conf)
   (:documentation "CONF is meant to be a PLIST and OBJECT a class
@@ -94,10 +106,16 @@
   (concatenate 'string (pathname-name path)
                (when include-type (list  "." (pathname-type path)))))
 
-
 (define-condition asset-key-collision-error (error)
   ((key  :initarg :key)
    (source :initarg :source)))
+
+(defun prompt-for-key (c)
+  (when-let (restart (find-restart 'use-key))
+    (with-slots (key source) c
+      (format t "The key ~a is already used by another asset.~% You choose a new a new asset key for source file at ~a~%.  Before entering the key, however, be sure to update any source files that use this asset to reflect the change.~%NEW KEY: "
+              key source)
+      (invoke-restart restart (read-line)))))
 
 (defun register-asset (asset)
   (if  (nth-value 1 (gethash (asset-key asset) *assets*))
@@ -108,13 +126,6 @@
                             :source (source-path asset))
          (use-key (new-key)
            (setf (asset-key asset) new-key)
-           (register-asset asset))
-         (prompt-user ()
-           (format t "The key ~a is already used by another asset.~%
-             Enter a new asset key for source file at ~a~%"
-                   (asset-key asset)
-                   (source-path asset))
-           (setf (asset-key asset) (read-line))
            (register-asset asset)))
        ;; otherwise just insert the asset into *assets*
        (setf (gethash (asset-key asset) *assets*) asset)))
@@ -278,6 +289,13 @@ either a path name or are NIL."
   ((source :initarg :source)
    (target :initarg :target)))
 
+(defun prompt-for-target (c)
+  (when-let (restart (find-restart 'use-target))
+    (with-slots (source target) c
+      (format t "The resource target ~a is already used by another resource.~% You should choose a new resource path for source file at ~a~%Before you do, however, ensure that you update your source files to reflect the new target path.~%NEW TARGET: "
+              source  target)
+      (invoke-restart restart (read-line)))))
+
 (defun register-resource (resource)
   (if  (nth-value 1 (gethash (target-path resource) *resources*))
        ;; If this exists in the *resources* table, signal an error and
@@ -287,13 +305,6 @@ either a path name or are NIL."
                             :target (target-path resource))
          (use-target (new-target)
            (setf (target-path resource) new-target)
-           (register-resource resource))
-         (prompt-user ()
-           (format t "The resource target ~a is already used by another resource.~%
-             Enter a new resource path for source file at ~a~%"
-                   (target-path resource)
-                   (source-path resource))
-           (setf (target-path resource) (read-line))
            (register-resource resource)))
        ;; otherwise just insert the resource into *resources*
        (setf (gethash (target-path resource) *resources*) resource)))
@@ -308,7 +319,9 @@ either a path name or are NIL."
     (when (typep instance 'resource)
       (register-resource instance))))
 
-(defun build-project (*source-root* *target-root*)
+;;; the main project builder
+
+(defun build-project ()
   (load-prelude)
   (let ((*assets* (make-hash-table :test 'equal))
         (*resources* (make-hash-table :test 'equal)))
@@ -322,6 +335,10 @@ either a path name or are NIL."
                            (process-source-config src yup overrides)))
                    (dolist (subdir (uiop:subdirectories dir))
                      (configureator subdir :parent-overrides overrides))))))
+
+      ;; TODO wrap the follioing in a handler-bind's here for
+      ;; resource-target-collision-error and asset-key-collision-error
+      ;; conditions. The policy should be controlled by a special var
       (configureator *source-root*))
     (loop for resource being the hash-values of *resources* do (build resource))))
 

@@ -27,6 +27,11 @@
   of a HANDLER-BIND. Will be used to invoke a restart for
   'RESOURCE-TARGET-COLLISION-ERROR conditions.")
 
+(defvar *config-error-log* nil
+  "The BUILD-PROJECT will not actually build the project if errors are
+  encountered and logged to this list.  Instead, the log will be
+  printed and you will be asked to resolve problems.")
+
 (defgeneric configure (object conf)
   (:documentation "CONF is meant to be a PLIST and OBJECT a class
   instance. The notion is that fields from the CONF are used to configure the OBJECT.")
@@ -110,12 +115,24 @@
   ((key  :initarg :key)
    (source :initarg :source)))
 
+(defmethod print-object ((c asset-key-collision-error) s)
+  (with-slots (key source) c
+    (format s "The asset key (~s) for ~a is already in use by another asset.~%"
+            key source)
+    c))
+
 (defun prompt-for-key (c)
   (when-let (restart (find-restart 'use-key))
-    (with-slots (key source) c
-      (format t "The key ~a is already used by another asset.~% You choose a new a new asset key for source file at ~a~%.  Before entering the key, however, be sure to update any source files that use this asset to reflect the change.~%NEW KEY: "
-              key source)
-      (invoke-restart restart (read-line)))))
+    (princ c) (terpri)
+    (princ "You must choose a new a new asset key. Before entering the key, however, be sure") (terpri)
+    (princ "to update any source files that may embed this asset to reflect the new key.") (terpri)
+    (princ "NEW KEY:")
+    (invoke-restart restart (read-line))))
+
+(defun log-key-collision (c)
+  (when-let (restart (find-restart 'skip-asset))
+    (push c *config-error-log*)
+    (invoke-restart restart)))
 
 (defun register-asset (asset)
   (if  (nth-value 1 (gethash (asset-key asset) *assets*))
@@ -126,7 +143,9 @@
                             :source (source-path asset))
          (use-key (new-key)
            (setf (asset-key asset) new-key)
-           (register-asset asset)))
+           (register-asset asset))
+
+         (skip-asset () (return-from register-asset)))
        ;; otherwise just insert the asset into *assets*
        (setf (gethash (asset-key asset) *assets*) asset)))
 
@@ -289,12 +308,24 @@ either a path name or are NIL."
   ((source :initarg :source)
    (target :initarg :target)))
 
+(defmethod print-object ((c resource-target-collision-error) s)
+  (with-slots (source target) c
+      (format s "TARGET COLLISION:The file ~s~% is being built to ~s~% but so is another resource."
+              source target)
+    c))
+
 (defun prompt-for-target (c)
   (when-let (restart (find-restart 'use-target))
-    (with-slots (source target) c
-      (format t "The resource target ~a is already used by another resource.~% You should choose a new resource path for source file at ~a~%Before you do, however, ensure that you update your source files to reflect the new target path.~%NEW TARGET: "
-              source  target)
-      (invoke-restart restart (read-line)))))
+    (princ c) (terpri)
+    (princ "You should choose a new target path. Before you do, however, ensure") (terpri)
+    (princ "that you update your source files to reflect the new target.~%") (terpri)
+    (princ "NEW TARGET:")
+    (invoke-restart restart (read-line))))
+
+(defun log-target-collision (c)
+  (when-let (restart (find-restart 'skip-resource))
+    (push c *config-error-log*)
+    (invoke-restart restart)))
 
 (defun register-resource (resource)
   (if  (nth-value 1 (gethash (target-path resource) *resources*))
@@ -305,7 +336,9 @@ either a path name or are NIL."
                             :target (target-path resource))
          (use-target (new-target)
            (setf (target-path resource) new-target)
-           (register-resource resource)))
+           (register-resource resource))
+
+         (skip-resource () (return-from register-resource)))
        ;; otherwise just insert the resource into *resources*
        (setf (gethash (target-path resource) *resources*) resource)))
 
@@ -340,7 +373,16 @@ either a path name or are NIL."
       ;; resource-target-collision-error and asset-key-collision-error
       ;; conditions. The policy should be controlled by a special var
       (configureator *source-root*))
-    (loop for resource being the hash-values of *resources* do (build resource))))
+    (if (null *config-error-log*)
+        (loop
+           :for resource :being :the :hash-values :of *resources*
+           :do (build resource))
+        (print-config-error-report))))
+
+(defun print-config-error-report ()
+  (format t "~%The project was not built due to the presence of these configuration errors:~%")
+  (dolist (e *config-error-log*)
+    (format t "~a~%" e)))
 
 ;;; some utilities
 

@@ -89,11 +89,11 @@ to the terminal and the project will not be built.")
               (source-path res) e)
       (if (y-or-n-p "Is the file ready to try rebuilding?")
           (build res)
-          (format "Skipping ~a~%" (source-path res))))
+          (format t "Skipping ~a~%" (source-path res))))
     (print-and-skip (e)
       (format t "While building ~a~%an error was encountered:~%~a~%"
               (source-path res) e)
-      (format "Skipping ~a~%" (source-path res)))))
+      (format t "Skipping ~a~%" (source-path res)))))
 
 (defmethod build ((res resource))
   (with-slots (source target) res 

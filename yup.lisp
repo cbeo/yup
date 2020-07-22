@@ -578,8 +578,8 @@ See docstrings for each for further information.
 
 (defmethod build ((proj external-project))
   (with-slots (source target) proj
-    (assert (uiop:directory-pathname-p source))
-    (assert (uiop:directory-pathname-p target))
+    (assert (and  (uiop:directory-pathname-p source)
+                  (uiop:directory-pathname-p target)))
     (uiop:collect-sub*directories
      source
      (complement #'actually-hidden-pathname-p)

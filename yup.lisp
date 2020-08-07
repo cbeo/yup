@@ -14,8 +14,8 @@
 
 (defvar *prelude* nil
   "Path to a lisp file loaded during configuration. If NIL a default
-  prelude , called 'prelude.lisp' will be searched for in
-  *SOURCE-ROOT*")
+  prelude , called 'prelude.lisp' will be searched for in the current
+  working directory")
 
 (defvar *configuration-restart-policy* nil
   "Either :INTERACTIVE or NIL.  
@@ -174,7 +174,10 @@ to the terminal and the project will not be built.")
 
 (defun read-file (path)
   (with-open-file (input path)
-    (read input)))
+    (loop
+       :for form = (read input nil :eof)
+       :until (eql form :eof)
+         :collect form)))
 
 
 ;; TODO: make this portable
@@ -507,7 +510,7 @@ See docstrings for each for further information.
           (markup (read-file source)))
       (ensure-directories-exist target)
       (with-open-file (spinneret:*html* target :direction :output :if-exists :supersede)
-        (eval `(spinneret:with-html ,markup))))))
+        (eval `(spinneret:with-html ,@markup))))))
 
 (defclass img (resource asset) ())
 

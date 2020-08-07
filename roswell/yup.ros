@@ -1,16 +1,16 @@
 #!/bin/sh
 #|-*- mode:lisp -*-|#
 #|
-exec ros -Q -L sbcl-bin -m speed -- $0 "$@"
+exec ros -Q -L sbcl-bin -- $0 "$@"
 |#
 (progn ;;init forms
   (ros:ensure-asdf)
   #+quicklisp(ql:quickload '(yup cl-fad) :silent t)
   )
 
-(defpackage :ros.script.yup.3801822927
+(defpackage :yup.build
   (:use :cl :yup))
-(in-package :ros.script.yup.3801822927)
+(in-package :yup.build)
 
 
 (defun flag-p (arg)

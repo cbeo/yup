@@ -462,7 +462,7 @@ See docstrings for each for further information.
         (configureator *source-root*)))
 
     (cond ((null *config-error-log*)
-           (format t "... CONFIGURATION OK!~% ... BUILDING~%")
+           (format t " ... CONFIGURATION OK!~% ... BUILDING~%")
            (handler-bind ((error (select-build-error-policy)))
              (loop
                 :for resource :being :the :hash-values :of *resources*

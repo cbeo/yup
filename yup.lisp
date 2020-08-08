@@ -43,8 +43,8 @@ to the terminal and the project will not be built.")
 (defvar *building-resource* nil
   "Dynamically bound  by BUILD - for use in EMBEDDING implementations.")
 
-(defmacro embed (key &rest args)
-  `(funcall #'embedding *building-resource* (gethash ,key *assets*) ,@args))
+(defun embed (key &rest args)
+  (apply #'embedding *building-resource* (gethash key *assets*) args))
 
 (defgeneric embedding (resource asset &key)
   (:documentation "Embeds the ASSET in the RESOURCE.  If evoked from

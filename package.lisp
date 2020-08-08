@@ -21,4 +21,15 @@
    #:build
    #:embedding
    #:resource
-   #:asset))
+   #:asset
+   #:external-project
+   #:img
+   #:spinneret
+   #:audio
+   #:video
+   #:lass
+   #:markdown
+   #:txt))
+
+(defpackage :yup.build
+  (:use :cl :yup))

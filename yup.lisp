@@ -259,7 +259,7 @@ to the terminal and the project will not be built.")
   orig)
 
 (defun read-yupfile (yupfile)
-  (list* :path yupfile (read-file yupfile)))
+  (list* :path yupfile (car (read-file yupfile))))
 
 (defun process-source-config (path yupfile directory-overrides)
   "Either PATH or YUPFILE may be NIL, DIRECTORY-OVERRIDES is a PLIST
@@ -367,7 +367,7 @@ either a path name or are NIL."
 
 (defmethod print-object ((c no-such-source-class) s)
   (with-slots (class source) c
-    (format s "BAD SOURCE CLASS: The configuration for ~s~%is trying to use a class ~s, but no such class is found.~%"
+    (format s "BAD SOURCE CLASS: The configuration for~%~s~%is trying to use a class ~s, but no such class is found.~%"
      source class)))
 
 (defun find-class-from-config (config)
@@ -379,8 +379,9 @@ either a path name or are NIL."
 
 (defun prompt-for-class (c)
   (when-let (restart (find-restart 'use-class-named))
-    (princ c) (terpri)
+    (princ c) (terpri) 
     (princ "Choose a new class: ")
+    (force-output)
     (invoke-restart restart (read))))
 
 (defun add-source-from-config (config)
@@ -446,7 +447,7 @@ See docstrings for each for further information.
     (labels ((configureator (dir &key parent-overrides)
                (multiple-value-bind (config mapping) (directory-config-scan dir)
                  (let ((overrides (if config
-                                      (update-plist parent-overrides (read-file config))
+                                      (update-plist parent-overrides (car (read-file config)))
                                       parent-overrides)))
                    (loop :for (src . yup) :in mapping
                       :do (add-source-from-config
@@ -457,11 +458,11 @@ See docstrings for each for further information.
       (handler-bind ((asset-key-collision-error (select-asset-collision-handler-policy))
                      (resource-target-collision-error (select-resource-collision-handler-policy))
                      (no-such-source-class (select-no-such-source-class-handler-policy)))
-        (format t "~%CONFIGURING THE BUILD ...~%~%")
+        (format t "~% ... CONFIGURING THE BUILD~%")
         (configureator *source-root*)))
 
     (cond ((null *config-error-log*)
-           (format t "~~% ... CONFIGURATION OK!~%~% BUILDING ...~%~%")
+           (format t "... CONFIGURATION OK!~% ... BUILDING~%")
            (handler-bind ((error (select-build-error-policy)))
              (loop
                 :for resource :being :the :hash-values :of *resources*

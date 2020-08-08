@@ -8,8 +8,6 @@ exec ros -Q -L sbcl-bin -- $0 "$@"
   #+quicklisp(ql:quickload '(yup cl-fad) :silent t)
   )
 
-(defpackage :yup.build
-  (:use :cl :yup))
 (in-package :yup.build)
 
 

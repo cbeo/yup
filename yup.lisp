@@ -115,7 +115,8 @@ produce the desired view."
 ;;; Pages & Templates
 
 (defmacro defstyle (name args &body forms)
-  (assert (and (listp args) (not (member '&key args))))
+  (assert (and (listp args) (not (member '&key args)) (not (member '&rest args)))
+          nil "DEFSTYLE creates implicit &KEY and &REST args - see docstring.")
   (let* ((lambda-list (append (list 'path)
                               (list* '&rest 'rest-args '&key args)
                               '((site yup:*site*))))

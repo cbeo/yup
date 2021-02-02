@@ -115,11 +115,10 @@ produce the desired view."
 ;;; Pages & Templates
 
 (defmacro defstyle (name args &body forms)
-  (let ((lambda-list (if (keyword-args-p args)
-                          (append (cons 'path args)
-                                  '((site yup:*site*)))
-                          (append (cons 'path args)
-                                  '(&key (site yup:*site*)))))
+  (assert (and (listp args) (not (member '&key args))))
+  (let* ((lambda-list (append (list 'path)
+                              (list* '&rest 'rest-args '&key args)
+                              '((site yup:*site*))))
         (forms (mapcar (lambda (form) `(quote ,form)) forms))) 
     `(defun ,(intern (format nil "STYLE/~a" name)) ,lambda-list
        (let ((yup:*site* site)
@@ -130,8 +129,8 @@ produce the desired view."
          (add-artifact
           path 
           (lass:compile-and-write 
-           (list :let (mapcar #'list ',args  (list ,@args))
-                  ,@forms)))))))
+           (list :let (plist->alist rest-args)
+                 ,@forms)))))))
 
 (defmacro defscript (name lambda-list &body forms)
   (let ((lambda-list (if (keyword-args-p lambda-list)
@@ -234,3 +233,7 @@ PATTERN is a regex filter for files, e.g. png$\"
                  :type (pathname-type subtree)
                  :directory (append (pathname-directory root )
                                     (cdr (pathname-directory subtree))))  )
+
+(defun plist->alist (plist)
+  (loop :for (key val . more) :on plist :by #'cddr 
+        :collect (list (intern (symbol-name key)) val)))

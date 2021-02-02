@@ -3,16 +3,26 @@
 (in-package #:yup)
 
 (defclass site ()
-  ((name :accessor site-name :initarg :name :initform "")
-   (build-to :accessor build-to :initarg :build-to :initform nil)
-   (assets :accessor assets :initform (make-hash-table :test 'equal)
-           :documentation "Represent files that need to be copied to
-           the build, and that can be embedded in various ways into
+  ((name
+    :accessor site-name
+    :initarg :name
+    :initform "")
+   (build-to
+    :accessor build-to
+    :initarg :build-to
+    :initform (error "must supply a build-to location"))
+   (assets
+    :accessor assets
+    :initform (make-hash-table :test 'equal)
+    :documentation "Represent files that need to be copied to the
+           build, and that can be embedded in various ways into
            pages.")
-   (artifacts :accessor artifacts :initform (make-hash-table :test 'equal)
-              :documentation "Represent objets built by YUP - pages
-              created by DEFPAGE functions, scripts created by
-              DEFSCRIPT functions, and stylesheets created by DEFSTYLE
+   (artifacts
+    :accessor artifacts
+    :initform (make-hash-table :test 'equal)
+    :documentation "Represent objets built by YUP - pages created by
+              DEFPAGE functions, scripts created by DEFSCRIPT
+              functions, and stylesheets created by DEFSTYLE
               functions.")))
 
 (defun make-site (name &key build-to)
@@ -221,8 +231,6 @@ PATTERN is a regex filter for files, e.g. png$\"
   (when recursive
     (dolist (subdir (uiop:subdirectories dir))
       (directory-foreach subdir action :pattern pattern :recursive t))))
-
-
 
 (defun keyword-args-p (lambda-list)
   (member '&key lambda-list

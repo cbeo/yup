@@ -14,6 +14,7 @@
    #:build-to
    #:add-page
    #:add-asset
+   #:get-asset
    #:add-directory-assets
    #:assets-like
    #:view

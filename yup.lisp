@@ -70,7 +70,7 @@ filter out unwanted files.
 If RECURSIVE, the process will use the same VIEW, PATTERN, and ARGS on
 nested subdirectories of the initial root DIR."
   (let ((drop-prefix
-          (1- (length (namestring (uiop:pathname-parent-directory-pathname dir))))))
+          (1- (length (namestring (uiop:truename* (uiop:pathname-directory-pathname dir)))))))
     (directory-foreach
      dir
      (lambda (filepath)

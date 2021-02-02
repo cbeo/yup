@@ -10,6 +10,7 @@
                #:lass
                #:parenscript
                #:uiop
-               #:alexandria)
+               #:alexandria
+               #:cl-ppcre)
   :components ((:file "package")
                (:file "yup")))

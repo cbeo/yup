@@ -5,21 +5,30 @@
 (defclass site ()
   ((name :accessor site-name :initarg :name :initform "")
    (build-to :accessor build-to :initarg :build-to :initform nil)
-   (assets :accessor assets :initform (make-hash-table :test 'equal))
-   (pages :accessor pages :initform (make-hash-table :test 'equal))))
+   (assets :accessor assets :initform (make-hash-table :test 'equal)
+           :documentation "Represent files that need to be copied to
+           the build, and that can be embedded in various ways into
+           pages.")
+   (artifacts :accessor artifacts :initform (make-hash-table :test 'equal)
+              :documentation "Represent objets built by YUP - pages
+              created by DEFPAGE functions, scripts created by
+              DEFSCRIPT functions, and stylesheets created by DEFSTYLE
+              functions.")))
 
 (defun make-site (name &key build-to)
   (make-instance 'site :name name :build-to build-to))
 
 (defvar *site* nil
-  "Used by ADD-PAGE, ADD-ASSET, BUILD, VIEW, and the functions defined
+  "Used by ADD-RESOURCE, ADD-ASSET, BUILD, VIEW, and the functions defined
   with DEFPAGE")
 
 ;;; Assets
 
-(defun add-page (path content &optional (site *site*))
-  (setf (gethash path (pages site)) content))
+(defun add-resource (path content &optional (site *site*))
+  (setf (gethash path (artifacts site)) content))
 
+(defun get-resource (path &optional (site *site*))
+  (gethash path (artifacts site)))
 
 (defun add-asset (path filepath view &key args key)
   "VIEW is a function that accepts the FILEPATH as an argument and
@@ -37,6 +46,13 @@ multiple views of the same underlying asset.
   (setf (gethash (if key key path) (assets *site*))
         (list :path path :filepath filepath :view view :args args)))
 
+(defun get-asset (key &optional (site *site*))
+  "Get an asset from a site. Returns a PLIST if the asset exists,
+otherwise NIL.
+
+KEY is the PATH identifier of the asset, or is a custom key supplied
+to ADD-ASSET."
+  (gethash key (assets site)))
 
 (defun add-directory-assets
     (dir view
@@ -65,7 +81,6 @@ nested subdirectories of the initial root DIR."
               args))
      :pattern pattern
      :recursive recursive)))
-
 
 (defun assets-like
     (pattern &key
@@ -98,6 +113,10 @@ produce the desired view."
     (error "No asset found for ~a" path)))
 
 ;;; Pages & Templates
+
+(defmacro defstyle (name lambda-list &body forms))
+
+(defmacro defscript (name lambda-list &body forms))
 
 (defmacro defpage (name (&key style js) lambda-list &body body)
   "DEFPAGE creates an html page template function that, when called,
@@ -133,18 +152,19 @@ TITLE is a string for the page title
                           (append lambda-list (cons '&key page-keywords)))))
     `(defun ,(intern (format nil "PAGE/~a" (string-upcase  name))) (path ,@lambda-list)
        (let ((*site* site))
-         (add-page path
-                   (with-html-string
-                     (:doctype)
-                     (:html
-                      (:head
-                       (:title title)
-                       ,(when style
-                          (list :link :rel "stylesheet" :href style)))
-                      (:body
-                       ,@body
-                       ,(when js
-                          (list :script :src js))))))))))
+         (add-resource
+          path
+          (with-html-string
+            (:doctype)
+            (:html
+             (:head
+              (:title title)
+              ,(when style
+                 (list :link :rel "stylesheet" :href style)))
+             (:body
+              ,@body
+              ,(when js
+                 (list :script :src js))))))))))
 
 
 (defmacro deftemplate (name lambda-list &body body)
@@ -163,10 +183,8 @@ an asset pathname.  It adds ASSET to the front of the LAMBDA-LIST.
 
 (defview blah () ...) DEFINES a function called VIEW/BLAH"
   `(defun ,(intern (format nil "VIEW/~a" (string-upcase  name))) ,(cons 'asset lambda-list)
+     (assert (not (null (asset ))))
      (with-html ,@body)))
-
-
-;;; Style
 
 ;;; Build
 

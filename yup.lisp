@@ -24,10 +24,10 @@
 
 ;;; Assets
 
-(defun add-resource (path content &optional (site *site*))
+(defun add-artifact (path content &optional (site *site*))
   (setf (gethash path (artifacts site)) content))
 
-(defun get-resource (path &optional (site *site*))
+(defun get-artifact (path &optional (site *site*))
   (gethash path (artifacts site)))
 
 (defun add-asset (path filepath view &key args key)
@@ -114,45 +114,48 @@ produce the desired view."
 
 ;;; Pages & Templates
 
-(defmacro defstyle (name lambda-list &body forms))
+(defmacro defstyle (name args &body forms)
+  (let ((lambda-list (if (keyword-args-p args)
+                          (append (cons 'path args)
+                                  '((site yup:*site*)))
+                          (append (cons 'path args)
+                                  '(&key (site yup:*site*)))))
+        (forms (mapcar (lambda (form) `(quote ,form)) forms))) 
+    `(defun ,(intern (format nil "STYLE/~a" name)) ,lambda-list
+       (let ((yup:*site* site)
+             (path (if (ends-with-p path ".css") path
+                       (progn
+                         (format *error-output* "Transforming key ~a to ~a.css" path path)
+                         (concatenate 'string path ".css")))))
+         (add-artifact
+          path 
+          (lass:compile-and-write 
+           (list :let (mapcar #'list ',args  (list ,@args))
+                  ,@forms)))))))
 
-(defmacro defscript (name lambda-list &body forms))
+(defmacro defscript (name lambda-list &body forms)
+  (let ((lambda-list (if (keyword-args-p lambda-list)
+                         (append (cons 'path lambda-list)
+                                 '((site yup:*site*)))
+                         (append (cons 'path lambda-list)
+                                 '(&key (site yup:*site*)))))) 
+    `(defun ,(intern (format nil "SCRIPT/~a" name)) ,lambda-list
+       (let ((yup:*site* site)
+             (path (if (ends-with-p path ".js") path
+                       (progn
+                         (format *error-output* "Transforming key ~a to ~a.js" path path)))))
+         (add-artifact
+          path 
+          (ps:ps ,@forms))))))
 
 (defmacro defpage (name (&key style js) lambda-list &body body)
-  "DEFPAGE creates an html page template function that, when called,
-will place an HTML string into the *PAGES* table.  When BUILD-SITE is
-called, these pages will be written to disk.
-
-(defpage moo () () ...) defines a function called PAGE/MOO
-
-STYLE is a URL path to a stylesheet 
-JS is a is a URL path to a javascript document
-
-Whatever template-specific variables are added to the LAMBDA-LIST by
-the user, DEFPAGE adds a number of its own variables. No checking is
-done for unwanted anaphora.  These additional variables are:
-
-Required Variables:
-
-PATH will always be the first variable, it is a string.  This
-represents the path of the page relative to the serving host.  The
-HTML document itself will be built in a location configurable by
-BUILD-SITE.
-
-Keyword Variables:
-
-TITLE is a string for the page title 
-"
-  (let* ((page-keywords '((title "") (site *site*)))
-         (lambda-list (if (member '&key lambda-list
-                                  :test (lambda (a b)
-                                          (string-equal (symbol-name a)
-                                                        (symbol-name b))))
-                          (append lambda-list page-keywords)
-                          (append lambda-list (cons '&key page-keywords)))))
-    `(defun ,(intern (format nil "PAGE/~a" (string-upcase  name))) (path ,@lambda-list)
-       (let ((*site* site))
-         (add-resource
+  (let* ((page-keywords '((title "") (site yup:*site*)))
+         (lambda-list (if (keyword-args-p lambda-list)
+                          (append (cons 'path lambda-list) page-keywords)
+                          (append (cons 'path  lambda-list) (cons '&key page-keywords)))))
+    `(defun ,(intern (format nil "PAGE/~a" name)) ,lambda-list
+       (let ((yup:*site* site))
+         (add-artifact
           path
           (with-html-string
             (:doctype)
@@ -168,25 +171,35 @@ TITLE is a string for the page title
 
 
 (defmacro deftemplate (name lambda-list &body body)
-  "DEFTEMPLATE defines a simple HTML-generating function meant to be
-called within a DEFPAGE body.
-
-(deftemplate foo () ...) defines a function TEMPLATE/FOO
-"
-  `(defun ,(intern (format nil "TEMPLATE/~a" (string-upcase name))) ,lambda-list
+  `(defun ,(intern (format nil "TEMPLATE/~a" name)) ,lambda-list
      (with-html ,@body)))
 
 
 (defmacro defview (name lambda-list &body body)
-  "DEFVIEW defines an HTML-generating function meant to be called on
-an asset pathname.  It adds ASSET to the front of the LAMBDA-LIST.
-
-(defview blah () ...) DEFINES a function called VIEW/BLAH"
   `(defun ,(intern (format nil "VIEW/~a" (string-upcase  name))) ,(cons 'asset lambda-list)
      (assert (not (null (asset ))))
      (with-html ,@body)))
 
 ;;; Build
+
+(defun build (&optional (site yup:*site*))
+  (assert site)
+  (with-slots (name build-to assets artifacts) site
+    (ensure-directories-exist build-to)
+    (loop :for asset :being :the :hash-value :of assets
+          :for built-loc = (make-subtree-pathname build-to (getf asset :path))
+          :do
+             (ensure-directories-exist built-loc)
+             (uiop:copy-file
+              (getf asset :filepath)
+              built-loc))
+    (loop :for path :being :the :hash-key :of artifacts
+          :for content :being :the :hash-value :of artifacts
+          :for built-loc = (make-subtree-pathname built-loc path)
+          :do
+             (ensure-directories-exist built-loc)
+             (alexandria:write-string-into-file content built-loc))
+    (format t "BUILT ~a" name)))
 
 ;;; Util
 
@@ -207,3 +220,21 @@ PATTERN is a filter for files, e.g. #P\"*.png\"
   (when recursive
     (dolist (subdir (uiop:subdirectories dir))
       (directory-foreach subdir action :pattern pattern :recursive t))))
+
+
+
+(defun keyword-args-p (lambda-list)
+  (member '&key lambda-list
+          :test (lambda (a b)
+                  (string-equal (symbol-name a)
+                                (symbol-name b)))))
+
+(defun ends-with-p (string ext)
+  (string-equal string ext :start1 (- (length string) (length ext))))
+
+
+(defun make-subtree-pathname (root subtree)
+  (make-pathname :name (pathname-name subtree)
+                 :type (pathname-type subtree)
+                 :directory (append (pathname-directory root )
+                                    (cdr (pathname-directory subtree))))  )

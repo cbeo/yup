@@ -20,6 +20,7 @@
    #:defpage
    #:deftemplate
    #:defview
-   #:directory-foreach))
+   #:directory-foreach
+   #:build))
 
 

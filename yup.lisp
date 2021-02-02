@@ -192,24 +192,24 @@ produce the desired view."
 
 ;;; Build
 
-(defun build (&optional (site yup:*site*))
-  (assert site)
-  (with-slots (name build-to assets artifacts) site
-    (ensure-directories-exist build-to)
-    (loop :for asset :being :the :hash-value :of assets
-          :for built-loc = (make-subtree-pathname build-to (getf asset :path))
-          :do
-             (ensure-directories-exist built-loc)
-             (uiop:copy-file
-              (getf asset :filepath)
-              built-loc))
-    (loop :for path :being :the :hash-key :of artifacts
-          :for content :being :the :hash-value :of artifacts
-          :for built-loc = (make-subtree-pathname built-loc path)
-          :do
-             (ensure-directories-exist built-loc)
-             (alexandria:write-string-into-file content built-loc))
-    (format t "BUILT ~a" name)))
+(defun build (site)
+  (let ((*site* site))
+    (with-slots (name build-to assets artifacts) site
+      (ensure-directories-exist build-to)
+      (loop :for asset :being :the :hash-value :of assets
+            :for built-loc = (make-subtree-pathname build-to (getf asset :path))
+            :do
+               (ensure-directories-exist built-loc)
+               (uiop:copy-file
+                (getf asset :filepath)
+                built-loc))
+      (loop :for path :being :the :hash-key :of artifacts
+            :for content :being :the :hash-value :of artifacts
+            :for built-loc = (make-subtree-pathname build-to path)
+            :do
+               (ensure-directories-exist built-loc)
+               (alexandria:write-string-into-file content built-loc
+                                                  :if-exists :supersede)))))
 
 ;;; Util
 
@@ -253,3 +253,36 @@ PATTERN is a regex filter for files, e.g. png$\"
         :for supplied = (getf plist (intern (symbol-name key) (find-package 'keyword)))
         :collect (list key
                        (if supplied supplied default))))
+
+;;; Development Server
+
+(defvar *development-acceptor*)
+
+(defun hack-on (site recipe &key (port 4242) (rebuild-freqeuncy 1))
+  "SITE is an instance of SITE.  RECIPE is a thunk that builds the
+site through calls to PAGE/*, SCRIPT/*, STYLE/*, and ADD-ASSET
+functions.
+
+It is recommend to pass in a symbol that names a thunk, that way you
+can change and recompile the thunk while hacking.
+
+The site will be built every REBUILD-FREQEUNCY seconds and served
+locally on PORT."
+  (setf *development-acceptor*
+        (hunchentoot:start (make-instance 'hunchentoot:easy-acceptor
+                                          :port port
+                                          :document-root (build-to site))))
+  (bt:make-thread
+   (lambda () 
+     (let ((*site* site))
+       (format t "Started Hacking on ~a~%. Connect on port ~a~%" (site-name site) port)
+       (loop :while (hunchentoot:started-p  *development-acceptor*)
+             :do
+                (funcall recipe)
+                (build site)
+                (sleep rebuild-freqeuncy))
+       (format t "Stopped Hacking on ~a~%" (site-name site))))))
+
+
+(defun stop-hacking ()
+  (hunchentoot:stop *development-acceptor*))

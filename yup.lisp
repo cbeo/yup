@@ -29,8 +29,8 @@
   (make-instance 'site :name name :build-to build-to))
 
 (defvar *site* nil
-  "Used by ADD-RESOURCE, ADD-ASSET, BUILD, VIEW, and the functions defined
-  with DEFPAGE")
+  "Used by ADD-RESOURCE, ADD-ASSET, VIEW, and the functions defined
+  with DEFPAGE, DEFSCRIPT, and DEFSTYLE")
 
 ;;; Assets
 
@@ -46,8 +46,10 @@ produces some HTML. If ARGS are supplied these are passed to VIEW as
 well.
 
 If you wish to refer to an asset by key instead of the full path, you
-can do so by supplying a KEY argument.  For example, if you want
-multiple views of the same underlying asset.
+can do so by supplying a KEY argument.  E.g. if you want multiple
+views of the same underlying asset, then you can add that asset
+multiple times with different views, choosing a different KEY for each
+one.
 "
   (assert (and (symbolp view)
                (string-equal "VIEW/" (symbol-name view) :end2 5))
@@ -125,6 +127,16 @@ produce the desired view."
 ;;; Pages & Templates
 
 (defmacro defstyle (name args &body forms)
+  "Defines a function that adds a stylesheet to a site. ARGS must be a
+list each member of which is either a SYMBOL or a (SYMBOL VALUE) pair,
+where VALUE is suitable for passing as the value of a variable in a
+LASS form.
+
+(defstyle moo () ...) defines STYLE/MOO 
+
+The ARGS become keyword arguments to the defined function.
+
+FORMS are the sort suitable for passint to LASS:COMPILE-AND-WRITE"
   (assert (and (listp args) (not (member '&key args)) (not (member '&rest args)))
           nil "DEFSTYLE creates implicit &KEY and &REST args - see docstring.")
   (let* ((lambda-list (append (list 'path)
@@ -149,6 +161,11 @@ produce the desired view."
                  ,@forms)))))))
 
 (defmacro defscript (name lambda-list &body forms)
+  "Defines a function that adds a javascript script to a site. 
+
+(defscript moo () ...) defines SCRIPT/MOO
+
+FORMS are the sort suitable for passing to PARENSCRIPT:PS"
   (let ((lambda-list (if (keyword-args-p lambda-list)
                          (append (cons 'path lambda-list)
                                  '((site yup:*site*)))
@@ -164,6 +181,16 @@ produce the desired view."
           (ps:ps ,@forms))))))
 
 (defmacro defpage (name (&key style js) lambda-list &body body)
+  "Defines a template function that adds an html page to a site.  
+
+(defpage moo () () ...) defines PAGE/MOO
+
+Because a particular template is so closely associated with a
+particular piece of JS or CSS, the macro accepts optional parameters
+to include static JS ro CSS into every page created with the defined tempalte.
+
+The BODY is a collection of forms suitable for passing to
+SPINNERET:WITH-HTML-STRING."
   (let* ((page-keywords '((title "") (site yup:*site*)))
          (lambda-list (if (keyword-args-p lambda-list)
                           (append (cons 'path lambda-list) page-keywords)
@@ -187,12 +214,21 @@ produce the desired view."
 
 
 (defmacro defview (name lambda-list &body body)
+  "Defines an HTML template function to be called from within a
+function defined using DEFPAGE. 
+
+(defview moo () ...) defines VIEW/MOO
+
+VIEW/* functions can be associated with assets as arguments to
+ADD-ASSET or ADD-DIRECTORY-ASSETS, in which case they are expected
+to have a url pathname as their first argument."
   `(defun ,(intern (format nil "VIEW/~a" (string-upcase  name))) ,lambda-list
      (with-html ,@body)))
 
 ;;; Build
 
 (defun build (site)
+  "Builds the SITE, producing files in location indicated by the site's BUILT-TO slot."
   (let ((*site* site))
     (with-slots (name build-to assets artifacts) site
       (ensure-directories-exist build-to)
@@ -285,4 +321,5 @@ locally on PORT."
 
 
 (defun stop-hacking ()
+  "Stop the deveopment server."
   (hunchentoot:stop *development-acceptor*))

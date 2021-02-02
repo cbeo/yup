@@ -57,15 +57,14 @@ to ADD-ASSET."
 (defun add-directory-assets
     (dir view
      &key
-       (pattern uiop:*wild-file-for-directory*)
+       (pattern ".")
        args
        (recursive t))
   "Adds a directory on disk to the *SITE* assets.  The path of each
 file will be relative to the DIR.  The same view will be given to each
 file. Good for adding, e.g., directories of images or media files.
 
-PATTERN is a PATHNAME suitable for passing to uiop:directory-files to
-filter out unwanted files. 
+PATTERN is a regex pattern to match namestrings of filepaths.
 
 If RECURSIVE, the process will use the same VIEW, PATTERN, and ARGS on
 nested subdirectories of the initial root DIR."
@@ -202,16 +201,17 @@ produce the desired view."
 (defun directory-foreach
     (dir action
      &key
-       (pattern uiop/pathname:*wild-file-for-directory*)
+       (pattern ".") ; a regex
        (recursive t))
   "Performs an action on each file pathname in a directory.  
 
 DIR is a directory.
 ACTION is a function of one argument, a pathname. 
-PATTERN is a filter for files, e.g. #P\"*.png\"
+PATTERN is a regex filter for files, e.g. png$\"
 "
-  (dolist (filepath (uiop:directory-files dir pattern))
-    (funcall action filepath))
+  (dolist (filepath (uiop:directory-files dir))
+    (when (ppcre:scan pattern (namestring filepath))
+      (funcall action filepath)))
 
   (when recursive
     (dolist (subdir (uiop:subdirectories dir))

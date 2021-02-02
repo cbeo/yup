@@ -1,19 +1,15 @@
 ;;;; yup.asd
 
 (asdf:defsystem #:yup
-  :description "Describe yup here"
-  :author "Your Name <your.name@example.com>"
-  :license  "Specify license here"
+  :description "A system for building static web sites."
+  :author "Colin Okay <okay@toyful.space>"
+  :license  "GPL-3.0"
   :version "0.0.1"
   :serial t
   :depends-on (#:spinneret
                #:lass
                #:parenscript
-               #:cl-conspack
                #:uiop
-               #:cl-markdown
-               #:cl-fad
-               #:alexandria
-               #:serapeum)
+               #:alexandria)
   :components ((:file "package")
                (:file "yup")))

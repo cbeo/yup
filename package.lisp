@@ -2,34 +2,24 @@
 
 (defpackage #:yup
   (:use #:cl)
-  (:import-from
-   #:alexandria
-   #:read-file-into-string
-   #:write-string-into-file
-   #:if-let
-   #:when-let)
-  (:import-from
-   #:spinneret
-   #:with-html
-   #:with-html-string)
-  (:import-from
-   #:serapeum
-   #:find-class-safe)
+  (:import-from #:alexandria
+                #:if-let
+                #:when-let)
+  (:import-from #:spinneret
+                #:with-html
+                #:with-html-string)
   (:export
-   #:embed
-   #:configure
-   #:build
-   #:embedding
-   #:resource
-   #:asset
-   #:external-project
-   #:img
-   #:spinneret
-   #:audio
-   #:video
-   #:lass
-   #:markdown
-   #:txt))
+   #:*site*
+   #:site-name
+   #:build-to
+   #:add-page
+   #:add-asset
+   #:add-directory-assets
+   #:assets-like
+   #:view
+   #:defpage
+   #:deftemplate
+   #:defview
+   #:directory-foreach))
 
-(defpackage :yup.build
-  (:use :cl :yup))
+

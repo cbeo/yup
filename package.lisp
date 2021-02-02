@@ -18,9 +18,9 @@
    #:assets-like
    #:view
    #:defpage
-   #:deftemplate
    #:defview
    #:directory-foreach
+   #:make-site
    #:build))
 
 

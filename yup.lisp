@@ -84,11 +84,12 @@ nested subdirectories of the initial root DIR."
 
 (defun assets-like
     (pattern &key
+               (site yup:*site*)
                (case-insensitive t)
                (sort-by 'string<=))
   "Return a list of keys of assets that match the pattern."
   (let ((regex (ppcre:create-scanner pattern :case-insensitive-mode case-insensitive))
-        (assets (assets *site*)))
+        (assets (assets site)))
     (sort 
      (loop :for key :being :the :hash-keys :of assets
            :when (ppcre:scan regex key) :collect key)
@@ -170,14 +171,9 @@ produce the desired view."
                  (list :script :src js))))))))))
 
 
-(defmacro deftemplate (name lambda-list &body body)
-  `(defun ,(intern (format nil "TEMPLATE/~a" name)) ,lambda-list
-     (with-html ,@body)))
-
 
 (defmacro defview (name lambda-list &body body)
-  `(defun ,(intern (format nil "VIEW/~a" (string-upcase  name))) ,(cons 'asset lambda-list)
-     (assert (not (null (asset ))))
+  `(defun ,(intern (format nil "VIEW/~a" (string-upcase  name))) ,lambda-list
      (with-html ,@body)))
 
 ;;; Build

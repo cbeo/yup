@@ -121,6 +121,8 @@ produce the desired view."
                               '((site yup:*site*))))
         (forms (mapcar (lambda (form) `(quote ,form)) forms))) 
     `(defun ,(intern (format nil "STYLE/~a" name)) ,lambda-list
+       (declare (ignorable ,@(mapcar (lambda (a) (if (consp a) (car a) a))
+                                     args)))
        (let ((yup:*site* site)
              (path (if (ends-with-p path ".css") path
                        (progn
@@ -129,7 +131,10 @@ produce the desired view."
          (add-artifact
           path 
           (lass:compile-and-write 
-           (list :let (plist->alist rest-args)
+           (list :let (rest-kwargs->alist
+                       rest-args
+                       (mapcar (lambda (entry) (if (consp entry) entry (list entry)))
+                               ',args))
                  ,@forms)))))))
 
 (defmacro defscript (name lambda-list &body forms)
@@ -234,6 +239,8 @@ PATTERN is a regex filter for files, e.g. png$\"
                  :directory (append (pathname-directory root )
                                     (cdr (pathname-directory subtree))))  )
 
-(defun plist->alist (plist)
-  (loop :for (key val . more) :on plist :by #'cddr 
-        :collect (list (intern (symbol-name key)) val)))
+(defun rest-kwargs->alist (plist defaults)
+  (loop :for (key default) :in defaults
+        :for supplied = (getf plist (intern (symbol-name key) (find-package 'keyword)))
+        :collect (list key
+                       (if supplied supplied default))))

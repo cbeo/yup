@@ -20,6 +20,7 @@
    #:view
    #:defpage
    #:defview
+   #:view/img
    #:directory-foreach
    #:make-site
    #:clean

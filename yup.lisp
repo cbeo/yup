@@ -225,6 +225,13 @@ to have a url pathname as their first argument."
   `(defun ,(intern (format nil "VIEW/~a" (string-upcase  name))) ,lambda-list
      (with-html ,@body)))
 
+
+;;; UTILITY VIEWS
+
+(defview img (src-path &key class id)
+  (:img :src src-path :class class :id id))
+
+
 ;;; Build
 
 (defun clean (site)

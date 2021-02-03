@@ -32,6 +32,11 @@
   "Used by ADD-RESOURCE, ADD-ASSET, VIEW, and the functions defined
   with DEFPAGE, DEFSCRIPT, and DEFSTYLE")
 
+(defvar *auto-refresh-key* nil
+  "Used by the development server started via HACK-ON. When non NIL,
+  page building functions will inject a polling operation to check
+  for changes and, when found, will perform a refresh of the page.")
+
 ;;; Assets
 
 (defun add-artifact (path content &optional (site *site*))
@@ -209,7 +214,8 @@ SPINNERET:WITH-HTML-STRING."
              (:body
               ,@body
               ,(when js
-                 (list :script :src js))))))))))
+                 (list :script :src js))
+              (view/auto-refresh-script)))))))))
 
 
 
@@ -231,6 +237,25 @@ to have a url pathname as their first argument."
 (defview img (src-path &key class id)
   (:img :src src-path :class class :id id))
 
+;;; Auto Refresh Script
+
+;; a script that is injected into defpage pages when
+;; *auto-refresh-key* is non-nil.  The script polls the development
+;; server for a special file containing a boolean. If the poll returns
+;; true then the page refreshes.
+(defview auto-refresh-script ()
+  (when yup::*auto-refresh-key*
+    (:script
+     (ps:ps
+       (let ((poll-url (+ "/" (ps:lisp yup::*auto-refresh-key*) ".json")))
+         (set-interval
+          (lambda ()
+            (let ((fetched (fetch poll-url)))
+              (ps:chain fetched
+                        (then (lambda (resp) (ps:chain resp (json))))
+                        (then (lambda (json)
+                                (when json (ps:chain location (reload))))))))
+          1000))))))
 
 ;;; Build
 
@@ -303,11 +328,54 @@ PATTERN is a regex filter for files, e.g. png$\"
         :collect (list key
                        (if supplied supplied default))))
 
+(defun make-auto-refresh-key ()
+  (symbol-name (gensym "auto-refresh-")))
+
+(defun backup-site (site)
+  (list :assets (assets site)
+        :artifacts (artifacts site)))
+
+(defun table-subset-p (tab1 tab2 &key (test 'equal))
+  "TEST compares values"
+  (loop :for key :being :the :hash-key :of tab1
+        :when (or (not (gethash key tab2))
+                  (not (funcall test
+                                (gethash key tab1)
+                                (gethash key tab2))))
+          :do (return nil)
+        :finally (return t)))
+
+(defun tables-equal-p (tab1 tab2 &key (test 'equal))
+  (and (table-subset-p tab1 tab2 :test test)
+       (table-subset-p tab2 tab1 :test test)))
+
+(defun site-changed-p (backup site)
+  "A site has changed since backed up if either the asset table or the
+artifact tables have changed."
+  (not (and (tables-equal-p (getf backup :assets)
+                            (assets site))
+            (tables-equal-p (getf backup :artifacts)
+                            (artifacts site)))))
+
+(defun mark-autorefresh-true ()
+  (when (and *auto-refresh-key* *site*)
+    (alexandria:write-string-into-file
+     "true"
+     (format nil "~a/~a.json" (build-to *site*) *auto-refresh-key*)
+     :if-exists :supersede )))
+
+(defun mark-autorefresh-false ()
+  (when (and *auto-refresh-key* *site*)
+    (alexandria:write-string-into-file
+     "false"
+     (format nil "~a/~a.json" (build-to *site*) *auto-refresh-key*)
+     :if-exists :supersede )))
+
 ;;; Development Server
 
 (defvar *development-acceptor*)
 
-(defun hack-on (site recipe &key (port 4242) (rebuild-freqeuncy 1))
+(defun hack-on (site recipe &key (port 4242) (rebuild-freqeuncy 1) auto-refresh)
   "SITE is an instance of SITE.  RECIPE is a thunk that builds the
 site through calls to PAGE/*, SCRIPT/*, STYLE/*, and ADD-ASSET
 functions.
@@ -323,14 +391,19 @@ locally on PORT."
                                           :document-root (build-to site))))
   (bt:make-thread
    (lambda () 
-     (let ((*site* site))
+     (let ((*site* site)
+           (*auto-refresh-key* (when auto-refresh (make-auto-refresh-key))))
        (format t "Started Hacking on ~a~%. Connect on port ~a~%" (site-name site) port)
        (loop :while (hunchentoot:started-p  *development-acceptor*)
              :do
-                (clean site)
-                (funcall recipe)
-                (build site)
-                (sleep rebuild-freqeuncy))
+                (let ((backup (backup-site site)))
+                  (clean site)
+                  (funcall recipe) ; the recipe is likely to rely on *site* having a value
+                  (cond ((site-changed-p backup site)
+                         (build site)
+                         (mark-autorefresh-true))
+                        (*auto-refresh-key* (mark-autorefresh-false)))
+                  (sleep rebuild-freqeuncy)))
        (format t "Stopped Hacking on ~a~%" (site-name site))))))
 
 

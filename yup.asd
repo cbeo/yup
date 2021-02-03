@@ -11,6 +11,7 @@
                #:parenscript
                #:uiop
                #:alexandria
-               #:cl-ppcre)
+               #:cl-ppcre
+               #:hunchentoot)
   :components ((:file "package")
                (:file "yup")))

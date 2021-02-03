@@ -320,6 +320,7 @@ locally on PORT."
        (format t "Started Hacking on ~a~%. Connect on port ~a~%" (site-name site) port)
        (loop :while (hunchentoot:started-p  *development-acceptor*)
              :do
+                (clean site)
                 (funcall recipe)
                 (build site)
                 (sleep rebuild-freqeuncy))

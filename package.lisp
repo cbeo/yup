@@ -22,6 +22,7 @@
    #:defview
    #:directory-foreach
    #:make-site
+   #:clean
    #:build
    #:hack-on
    #:stop-hacking))

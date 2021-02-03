@@ -227,6 +227,12 @@ to have a url pathname as their first argument."
 
 ;;; Build
 
+(defun clean (site)
+  "Erases assets and artifacts from the site."
+  (setf (assets site) (make-hash-table :test 'equal)
+        (artifacts site) (make-hash-table :test 'equal)))
+
+
 (defun build (site)
   "Builds the SITE, producing files in location indicated by the site's BUILT-TO slot."
   (let ((*site* site))

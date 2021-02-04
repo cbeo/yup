@@ -178,8 +178,11 @@ where `yup:*site*` is bound to a site instance. See below.
     (page/gallery page-link :title (gallery-title-from-link page-link)))
 
   ;; don't forget to add the styles and scripts
-  (style/main "/css/main.css") 
-  (script/slideshow "/js/slideshow.js"))  
+  (style/main "/css/main.css"  :bg "#123" 
+                               :color "#456" 
+                               :secondary-bg "#789" 
+                               :secondary-color "#ABC") 
+  (script/slideshow "/js/slideshow.js"))
 
 ```
 

@@ -188,7 +188,28 @@ FORMS are the sort suitable for passing to PARENSCRIPT:PS"
           path 
           (ps:ps ,@forms))))))
 
-(defmacro defpage (name (&key style js) lambda-list &body body)
+
+;;; Auto Refresh Script
+
+;; a script that is injected into defpage pages when
+;; *auto-refresh-key* is non-nil.  The script polls the development
+;; server for a special file containing a boolean. If the poll returns
+;; true then the page refreshes.
+(defview auto-refresh-script ()
+  (when yup::*auto-refresh-key*
+    (:script
+     (ps:ps
+       (let ((poll-url (+ "/" (ps:lisp yup::*auto-refresh-key*) ".json")))
+         (set-interval
+          (lambda ()
+            (let ((fetched (fetch poll-url)))
+              (ps:chain fetched
+                        (then (lambda (resp) (ps:chain resp (json))))
+                        (then (lambda (json)
+                                (when json (ps:chain location (reload))))))))
+          1000))))))
+
+(defmacro defpage (name (&key styles scripts) lambda-list &body body)
   "Defines a template function that adds an html page to a site.  
 
 (defpage moo () () ...) defines PAGE/MOO
@@ -212,14 +233,15 @@ SPINNERET:WITH-HTML-STRING."
             (:html
              (:head
               (:title title)
-              ,(when style
-                 (list :link :rel "stylesheet" :href style)))
+              ,(when styles
+                 `(dolist (style (list ,@styles)) 
+                    (:link :rel "stylesheet" :href style))))
              (:body
               ,@body
-              ,(when js
-                 (list :script :src js))
+              ,(when scripts
+                 `(dolist (js (list ,@scripts))
+                    (:script :src js)))
               (view/auto-refresh-script)))))))))
-
 
 
 (defmacro defview (name lambda-list &body body)
@@ -240,25 +262,6 @@ to have a url pathname as their first argument."
 (defview img (src-path &key class id)
   (:img :src src-path :class class :id id))
 
-;;; Auto Refresh Script
-
-;; a script that is injected into defpage pages when
-;; *auto-refresh-key* is non-nil.  The script polls the development
-;; server for a special file containing a boolean. If the poll returns
-;; true then the page refreshes.
-(defview auto-refresh-script ()
-  (when yup::*auto-refresh-key*
-    (:script
-     (ps:ps
-       (let ((poll-url (+ "/" (ps:lisp yup::*auto-refresh-key*) ".json")))
-         (set-interval
-          (lambda ()
-            (let ((fetched (fetch poll-url)))
-              (ps:chain fetched
-                        (then (lambda (resp) (ps:chain resp (json))))
-                        (then (lambda (json)
-                                (when json (ps:chain location (reload))))))))
-          1000))))))
 
 ;;; Build
 

@@ -10,22 +10,26 @@
                 #:with-html-string)
   (:export
    #:*site*
-   #:site-name
-   #:build-to
-   #:add-page
+   #:add-artifact
    #:add-asset
-   #:get-asset
    #:add-directory-assets
+   #:add-page
+   #:add-pre-build-action
+   #:add-post-build-action
    #:assets-like
-   #:view
+   #:build
+   #:build-to
+   #:clean
    #:defpage
    #:defview
-   #:view/img
    #:directory-foreach
-   #:make-site
-   #:clean
-   #:build
+   #:get-asset
    #:hack-on
-   #:stop-hacking))
+   #:make-site
+   #:site-name
+   #:stop-hacking
+   #:view
+   #:view/img
+   ))
 
 

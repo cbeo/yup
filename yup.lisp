@@ -23,7 +23,15 @@
     :documentation "Represent objets built by YUP - pages created by
               DEFPAGE functions, scripts created by DEFSCRIPT
               functions, and stylesheets created by DEFSTYLE
-              functions.")))
+              functions.")
+   (pre-build
+    :accessor pre-build
+    :initform nil
+    :documentation "A list thunks to be run before the build is run.")
+   (post-build
+    :accessor post-build
+    :initform nil
+    :documentation "A list of thunks to be run after the build has finished.")))
 
 (defun make-site (name &key build-to)
   (make-instance 'site :name name :build-to build-to))
@@ -37,7 +45,7 @@
   page building functions will inject a polling operation to check
   for changes and, when found, will perform a refresh of the page.")
 
-;;; Assets
+;;; Assets & Artifacts
 
 (defun add-artifact (path content &optional (site *site*))
   (setf (gethash path (artifacts site)) content))
@@ -111,6 +119,12 @@ nested subdirectories of the initial root DIR."
            :when (ppcre:scan regex key) :collect key)
      sort-by)))
 
+(defun add-pre-build-action (thunk &optional (site yup:*site*))
+  (pushnew thunk (pre-build site) ))
+
+(defun add-post-build-action ( thunk &optional (site yup:*site*))
+  (pushnew thunk (post-build site) ))
+
 
 (defun view (path)
   "Used inside template functions, such as those defined with DEFPAGE
@@ -128,6 +142,8 @@ produce the desired view."
            (getf asset :path)
            (getf asset :args))
     (error "No asset found for ~a" path)))
+
+
 
 ;;; Pages & Templates
 
@@ -268,8 +284,11 @@ to have a url pathname as their first argument."
 (defun build (site)
   "Builds the SITE, producing files in location indicated by the site's BUILT-TO slot."
   (let ((*site* site))
-    (with-slots (name build-to assets artifacts) site
+    (with-slots (name build-to assets artifacts pre-build post-build) site
+      (dolist (thunk pre-build) (funcall thunk))
+
       (ensure-directories-exist build-to)
+
       (loop :for asset :being :the :hash-value :of assets
             :for built-loc = (make-subtree-pathname build-to (getf asset :path))
             :do
@@ -277,13 +296,15 @@ to have a url pathname as their first argument."
                (uiop:copy-file
                 (getf asset :filepath)
                 built-loc))
+
       (loop :for path :being :the :hash-key :of artifacts
             :for content :being :the :hash-value :of artifacts
             :for built-loc = (make-subtree-pathname build-to path)
             :do
                (ensure-directories-exist built-loc)
                (alexandria:write-string-into-file content built-loc
-                                                  :if-exists :supersede)))))
+                                                  :if-exists :supersede))
+      (dolist (thunk post-build) (funcall thunk)))))
 
 ;;; Util
 

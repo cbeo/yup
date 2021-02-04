@@ -24,14 +24,7 @@
               DEFPAGE functions, scripts created by DEFSCRIPT
               functions, and stylesheets created by DEFSTYLE
               functions.")
-   (pre-build
-    :accessor pre-build
-    :initform nil
-    :documentation "A list thunks to be run before the build is run.")
-   (post-build
-    :accessor post-build
-    :initform nil
-    :documentation "A list of thunks to be run after the build has finished.")))
+   ))
 
 (defun make-site (name &key build-to)
   (make-instance 'site :name name :build-to build-to))
@@ -118,12 +111,6 @@ nested subdirectories of the initial root DIR."
      (loop :for key :being :the :hash-keys :of assets
            :when (ppcre:scan regex key) :collect key)
      sort-by)))
-
-(defun add-pre-build-action (thunk &optional (site yup:*site*))
-  (pushnew thunk (pre-build site) ))
-
-(defun add-post-build-action ( thunk &optional (site yup:*site*))
-  (pushnew thunk (post-build site) ))
 
 
 (defun view (path)
@@ -285,8 +272,6 @@ to have a url pathname as their first argument."
   "Builds the SITE, producing files in location indicated by the site's BUILT-TO slot."
   (let ((*site* site))
     (with-slots (name build-to assets artifacts pre-build post-build) site
-      (dolist (thunk pre-build) (funcall thunk))
-
       (ensure-directories-exist build-to)
 
       (loop :for asset :being :the :hash-value :of assets
@@ -303,8 +288,7 @@ to have a url pathname as their first argument."
             :do
                (ensure-directories-exist built-loc)
                (alexandria:write-string-into-file content built-loc
-                                                  :if-exists :supersede))
-      (dolist (thunk post-build) (funcall thunk)))))
+                                                  :if-exists :supersede)))))
 
 ;;; Util
 
@@ -421,10 +405,14 @@ locally on PORT."
                 (let ((backup (backup-site site)))
                   (clean site)
                   (funcall recipe) ; the recipe is likely to rely on *site* having a value
-                  (cond ((site-changed-p backup site)
-                         (build site)
-                         (mark-autorefresh-true))
-                        (*auto-refresh-key* (mark-autorefresh-false)))
+                  (cond
+                    ((site-changed-p backup site)
+                     (build site)
+                     (mark-autorefresh-true))
+
+                    (*auto-refresh-key*
+                     (mark-autorefresh-false)))
+
                   (sleep rebuild-freqeuncy)))
        (format t "Stopped Hacking on ~a~%" (site-name site))))))
 

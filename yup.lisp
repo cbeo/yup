@@ -375,7 +375,7 @@ artifact tables have changed."
 
 (defvar *development-acceptor*)
 
-(defun hack-on (site recipe &key (port 4242) (rebuild-freqeuncy 1) auto-refresh)
+(defun hack-on (site recipe &key (port 4242) (rebuild-freqeuncy 1) auto-refresh (log-to-repl t))
   "SITE is an instance of SITE.  RECIPE is a thunk that builds the
 site through calls to PAGE/*, SCRIPT/*, STYLE/*, and ADD-ASSET
 functions.
@@ -388,7 +388,8 @@ locally on PORT."
   (setf *development-acceptor*
         (hunchentoot:start (make-instance 'hunchentoot:easy-acceptor
                                           :port port
-                                          :document-root (build-to site))))
+                                          :document-root (build-to site)
+                                          :access-log-destination log-to-repl)))
   (bt:make-thread
    (lambda () 
      (let ((*site* site)

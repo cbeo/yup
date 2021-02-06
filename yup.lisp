@@ -95,7 +95,7 @@ nested subdirectories of the initial root DIR."
               (subseq (namestring filepath) drop-prefix)
               filepath
               view
-              args))
+              (list :args args)))
      :pattern pattern
      :recursive recursive)))
 

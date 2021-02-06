@@ -189,6 +189,18 @@ FORMS are the sort suitable for passing to PARENSCRIPT:PS"
           (ps:ps ,@forms))))))
 
 
+(defmacro defview (name lambda-list &body body)
+  "Defines an HTML template function to be called from within a
+function defined using DEFPAGE. 
+
+(defview moo () ...) defines VIEW/MOO
+
+VIEW/* functions can be associated with assets as arguments to
+ADD-ASSET or ADD-DIRECTORY-ASSETS, in which case they are expected
+to have a url pathname as their first argument."
+  `(defun ,(intern (format nil "VIEW/~a" (string-upcase  name))) ,lambda-list
+     (with-html ,@body)))
+
 ;;; Auto Refresh Script
 
 ;; a script that is injected into defpage pages when
@@ -208,6 +220,9 @@ FORMS are the sort suitable for passing to PARENSCRIPT:PS"
                         (then (lambda (json)
                                 (when json (ps:chain location (reload))))))))
           1000))))))
+
+
+
 
 (defmacro defpage (name (&key styles scripts) lambda-list &body body)
   "Defines a template function that adds an html page to a site.  
@@ -244,17 +259,7 @@ SPINNERET:WITH-HTML-STRING."
               (view/auto-refresh-script)))))))))
 
 
-(defmacro defview (name lambda-list &body body)
-  "Defines an HTML template function to be called from within a
-function defined using DEFPAGE. 
 
-(defview moo () ...) defines VIEW/MOO
-
-VIEW/* functions can be associated with assets as arguments to
-ADD-ASSET or ADD-DIRECTORY-ASSETS, in which case they are expected
-to have a url pathname as their first argument."
-  `(defun ,(intern (format nil "VIEW/~a" (string-upcase  name))) ,lambda-list
-     (with-html ,@body)))
 
 
 ;;; UTILITY VIEWS

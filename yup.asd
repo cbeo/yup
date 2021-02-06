@@ -4,7 +4,7 @@
   :description "A system for building static web sites."
   :author "Colin Okay <okay@toyful.space>"
   :license  "GPL-3.0"
-  :version "0.0.1"
+  :version "0.1.0"
   :serial t
   :depends-on (#:spinneret
                #:lass

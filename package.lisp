@@ -29,7 +29,6 @@
    #:site-name
    #:stop-hacking
    #:view
-   #:view/img
-   ))
+   #:view/img))
 
 

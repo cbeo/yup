@@ -23,8 +23,7 @@
     :documentation "Represent objets built by YUP - pages created by
               DEFPAGE functions, scripts created by DEFSCRIPT
               functions, and stylesheets created by DEFSTYLE
-              functions.")
-   ))
+              functions.")))
 
 (defun make-site (name &key build-to)
   (make-instance 'site :name name :build-to build-to))
@@ -259,14 +258,10 @@ SPINNERET:WITH-HTML-STRING."
               (view/auto-refresh-script)))))))))
 
 
-
-
-
 ;;; UTILITY VIEWS
 
 (defview img (src-path &key class id)
   (:img :src src-path :class class :id id))
-
 
 ;;; Build
 
@@ -333,7 +328,7 @@ PATTERN is a regex filter for files, e.g. png$\"
   (make-pathname :name (pathname-name subtree)
                  :type (pathname-type subtree)
                  :directory (append (pathname-directory root )
-                                    (cdr (pathname-directory subtree))))  )
+                                    (cdr (pathname-directory subtree)))))
 
 (defun rest-kwargs->alist (plist defaults)
   (loop :for (key default) :in defaults

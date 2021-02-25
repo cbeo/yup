@@ -388,7 +388,7 @@ artifact tables have changed."
 
 (defvar *development-acceptor*)
 
-(defun hack-on (site recipe &key (port 4242) (rebuild-freqeuncy 1) auto-refresh (log-to-repl t))
+(defun hack-on (site recipe &key (port 4242) (rebuild-freqeuncy 1) (auto-refresh t) log-to-repl)
   "SITE is an instance of SITE.  RECIPE is a thunk that builds the
 site through calls to PAGE/*, SCRIPT/*, STYLE/*, and ADD-ASSET
 functions.

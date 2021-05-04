@@ -22,6 +22,8 @@
    #:clean
    #:defpage
    #:defview
+   #:defstyle
+   #:defscript
    #:directory-foreach
    #:get-asset
    #:hack-on

@@ -171,7 +171,7 @@ where `yup:*site*` is bound to a site instance. See below.
     
   ;; now you can add some pages.
 
-  (page/main "/" :title "My Photos")
+  (page/main "index.html" :title "My Photos")
 
   ;; and one page per gallery
   (dolist (page-link (get-gallery-links))
@@ -191,9 +191,11 @@ instance and call the `yup:build` function.
 
 ```lisp 
 
-(defvar *my-site* (yup:make-site "My Galleries" :build-to "/path/to/docroot/www"))
+(defvar *my-site* 
+    (yup:make-site "My Galleries" :build-to "/path/to/docroot/www"))
 
-(let ((yup:*site* *my-site*)) ;; most of the functions in recipe assume yup:*site* is bound
+(let ((yup:*site* *my-site*)) 
+     ;; most of the functions in recipe assume yup:*site* is bound
    (recipe))
    
 (yup:build *my-site*)

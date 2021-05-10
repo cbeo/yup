@@ -234,20 +234,21 @@ to include static JS ro CSS into every page created with the defined tempalte.
 
 The BODY is a collection of forms suitable for passing to
 SPINNERET:WITH-HTML-STRING."
-  (let* ((page-keywords '((title "") (site yup:*site*)))
-         (path (gensym)) 
+  (let* ((page-keywords '((title "") metas (site yup:*site*)))
          (lambda-list (if (keyword-args-p lambda-list)
-                          (append (cons path lambda-list) page-keywords)
-                          (append (cons path  lambda-list) (cons '&key page-keywords)))))
+                          (append (cons 'path lambda-list) page-keywords)
+                          (append (cons 'path  lambda-list) (cons '&key page-keywords)))))
     `(defun ,(intern (format nil "PAGE/~a" name)) ,lambda-list
        (let ((yup:*site* site))
          (add-artifact
-          ,path
+          path
           (with-html-string
             (:doctype)
             (:html
              (:head
               (:title title)
+              (dolist (meta metas)
+                (:meta :name (first meta) :content (second meta)))
               ,(when styles
                  `(dolist (style (list ,@styles)) 
                     (:link :rel "stylesheet" :href style))))
